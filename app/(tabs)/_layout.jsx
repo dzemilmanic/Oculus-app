@@ -1,7 +1,36 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Layout() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    checkAuthStatus();
+    
+    // Listen for storage changes to update auth status
+    const interval = setInterval(checkAuthStatus, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem('jwtToken');
+      setIsLoggedIn(!!token);
+    } catch (error) {
+      setIsLoggedIn(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return null; // or a loading spinner
+  }
+
   return (
     <Tabs
       screenOptions={{
@@ -44,6 +73,36 @@ export default function Layout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="news"
+        options={{
+          title: 'Vesti',
+          tabBarIcon: ({ size, color }) => (
+            <Ionicons name="newspaper" size={size} color={color} />
+          ),
+        }}
+      />
+      {isLoggedIn ? (
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: 'Profil',
+            tabBarIcon: ({ size, color }) => (
+              <Ionicons name="person" size={size} color={color} />
+            ),
+          }}
+        />
+      ) : (
+        <Tabs.Screen
+          name="login"
+          options={{
+            title: 'Prijavi se',
+            tabBarIcon: ({ size, color }) => (
+              <Ionicons name="log-in" size={size} color={color} />
+            ),
+          }}
+        />
+      )}
     </Tabs>
   );
 }
