@@ -1,117 +1,118 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   TextInput,
-  Alert,
-  ActivityIndicator,
-  Modal,
+  TouchableOpacity,
+  StyleSheet,
   SafeAreaView,
-  Dimensions,
+  Alert,
+  ScrollView,
+  Modal,
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
+import { Pencil, Trash2, Search, X } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  Search,
-  ArrowUpDown,
-  Plus,
-  Pencil,
-  Trash2,
-  X,
-  Calendar,
-  Clock,
-} from 'lucide-react-native';
+import { getUserRoleFromToken, isTokenValid, decodeJWTToken } from '@/utils/tokenUtils';
 
-const { width: screenWidth } = Dimensions.get('window');
-
-export default function Services() {
+const Services = () => {
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [role, setRole] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortType, setSortType] = useState('none');
-  
-  // Modal states
-  const [showAddServiceModal, setShowAddServiceModal] = useState(false);
-  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showPriceModal, setShowPriceModal] = useState(false);
-  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
-  
-  // Form states
   const [newService, setNewService] = useState({
     name: '',
     description: '',
     price: '',
     categoryId: '',
   });
-  const [newCategory, setNewCategory] = useState({
-    name: '',
-    description: '',
-  });
+  const [categories, setCategories] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [showModal2, setShowModal2] = useState(false);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [role, setRole] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedServiceId, setSelectedServiceId] = useState(null);
-  const [selectedService, setSelectedService] = useState(null);
   const [newPrice, setNewPrice] = useState('');
-  
-  // Appointment states
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [selectedTime, setSelectedTime] = useState('');
-  const [availableTimes, setAvailableTimes] = useState([]);
+  const [showPriceModal, setShowPriceModal] = useState(false);
+  const [selectedService, setSelectedService] = useState(null);
+  const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortType, setSortType] = useState('none');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(null);
 
-  useEffect(() => {
-    fetchServices();
-    fetchCategories();
-    checkUserRole();
-  }, []);
-
-  const checkUserRole = async () => {
+  // Funkcija za čitanje i validaciju tokena
+  const checkTokenAndSetRole = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
-      if (token) {
-        const payload = token.split('.')[1];
-        const decodedPayload = JSON.parse(atob(payload));
-        const roles =
-          decodedPayload[
-            'http://schemas.microsoft.com/ws/2008/06/identity/claims/role'
-          ] || 'User';
-        setRole(roles);
+      
+      if (!token) {
+        setRole('');
+        return;
       }
-    } catch (error) {
-      console.error('Error decoding token:', error);
-    }
-  };
 
-  const fetchServices = async () => {
+      if (!isTokenValid(token)) {
+        await AsyncStorage.removeItem('jwtToken');
+        setRole('');
+        return;
+      }
+
+      const roles = getUserRoleFromToken(token);
+      setRole(roles);
+    } catch (error) {
+      console.error('Greška prilikom čitanja tokena:', error);
+      await AsyncStorage.removeItem('jwtToken');
+      setRole('');
+    }
+  }, []);
+
+  const fetchServices = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(
         'https://klinikabackend-production.up.railway.app/api/Service',
         {
           method: 'GET',
-          credentials: 'include',
         }
       );
 
       if (!response.ok) {
-        throw new Error('Greška prilikom fetchovanja usluga.');
+        throw new Error('Greška prilikom učitavanja usluga.');
       }
 
       const data = await response.json();
       setServices(data);
+
+      await checkTokenAndSetRole();
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [checkTokenAndSetRole]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchServices();
+    }, [fetchServices])
+  );
 
   const fetchCategories = async () => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
+      if (!token || !isTokenValid(token)) {
+        console.error('Nema validnog tokena');
+        return;
+      }
+
       const response = await fetch(
         'https://klinikabackend-production.up.railway.app/api/ServiceCategory',
         {
@@ -125,6 +126,8 @@ export default function Services() {
       if (response.ok) {
         const data = await response.json();
         setCategories(data);
+      } else {
+        throw new Error('Greška prilikom učitavanja kategorija.');
       }
     } catch (error) {
       console.error('Greška:', error);
@@ -132,28 +135,13 @@ export default function Services() {
   };
 
   const handleAddService = async () => {
-    if (!newService.name || !newService.description || !newService.price || !newService.categoryId) {
-      Alert.alert('Greška', 'Molimo popunite sva polja.');
-      return;
-    }
-
-    if (newService.name.length < 5) {
-      Alert.alert('Greška', 'Naziv usluge mora imati najmanje 5 karaktera.');
-      return;
-    }
-
-    if (newService.description.length < 5) {
-      Alert.alert('Greška', 'Opis usluge mora imati najmanje 5 karaktera.');
-      return;
-    }
-
-    if (parseFloat(newService.price) < 500) {
-      Alert.alert('Greška', 'Cena usluge mora biti najmanje 500.');
+    const token = await AsyncStorage.getItem('jwtToken');
+    if (!token || !isTokenValid(token)) {
+      Alert.alert('Greška', 'Sesija je istekla. Molimo prijavite se ponovo.');
       return;
     }
 
     try {
-      const token = await AsyncStorage.getItem('jwtToken');
       const response = await fetch(
         'https://klinikabackend-production.up.railway.app/api/Service',
         {
@@ -172,12 +160,23 @@ export default function Services() {
       );
 
       if (!response.ok) {
-        throw new Error('Greška pri dodavanju usluge.');
+        if (response.status === 401) {
+          Alert.alert('Greška', 'Sesija je istekla. Molimo prijavite se ponovo.');
+          await AsyncStorage.removeItem('jwtToken');
+          setRole('');
+          return;
+        }
+        const errorData = await response.json();
+        throw new Error(
+          errorData?.errors
+            ? Object.values(errorData.errors).flat().join(', ')
+            : 'Greška pri dodavanju usluge.'
+        );
       }
 
       const data = await response.json();
       setServices((prevServices) => [...prevServices, data]);
-      setShowAddServiceModal(false);
+      setShowModal(false);
       setNewService({
         name: '',
         description: '',
@@ -186,68 +185,43 @@ export default function Services() {
       });
       Alert.alert('Uspeh', 'Usluga uspešno dodata!');
     } catch (err) {
-      Alert.alert('Greška', err.message);
+      Alert.alert('Greška', `Error: ${err.message}`);
     }
   };
 
-  const handleAddCategory = async () => {
-    if (!newCategory.name || !newCategory.description) {
-      Alert.alert('Greška', 'Molimo popunite sva polja.');
-      return;
-    }
-
-    if (newCategory.name.length < 3) {
-      Alert.alert('Greška', 'Naziv kategorije mora biti najmanje 3 karaktera.');
-      return;
-    }
-
-    if (newCategory.description.length < 3) {
-      Alert.alert('Greška', 'Opis kategorije mora biti najmanje 3 karaktera.');
-      return;
-    }
-
-    try {
-      const token = await AsyncStorage.getItem('jwtToken');
-      const response = await fetch(
-        'https://klinikabackend-production.up.railway.app/api/ServiceCategory',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(newCategory),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setCategories((prevCategories) => [...prevCategories, data]);
-        setShowAddCategoryModal(false);
-        setNewCategory({ name: '', description: '' });
-        Alert.alert('Uspeh', 'Kategorija uspešno dodata!');
-      } else {
-        Alert.alert('Greška', 'Greška prilikom dodavanja kategorije.');
-      }
-    } catch (error) {
-      Alert.alert('Greška', 'Greška prilikom dodavanja kategorije.');
-    }
+  const handleDeleteClick = (id) => {
+    setSelectedServiceId(id);
+    setShowDeleteModal(true);
   };
 
-  const handleDeleteService = async () => {
+  const confirmDelete = async () => {
+    const token = await AsyncStorage.getItem('jwtToken');
+    if (!token || !isTokenValid(token)) {
+      Alert.alert('Greška', 'Sesija je istekla. Molimo prijavite se ponovo.');
+      return;
+    }
+
     try {
       const response = await fetch(
         `https://klinikabackend-production.up.railway.app/api/Service/${selectedServiceId}`,
         {
           method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
+      
       if (response.ok) {
         setServices((prevServices) =>
           prevServices.filter((service) => service.id !== selectedServiceId)
         );
         setShowDeleteModal(false);
         Alert.alert('Uspeh', 'Usluga uspešno izbrisana!');
+      } else if (response.status === 401) {
+        Alert.alert('Greška', 'Sesija je istekla. Molimo prijavite se ponovo.');
+        await AsyncStorage.removeItem('jwtToken');
+        setRole('');
       } else {
         throw new Error('Greška pri brisanju usluge.');
       }
@@ -256,14 +230,44 @@ export default function Services() {
     }
   };
 
+  const cancelDelete = () => {
+    setSelectedServiceId(null);
+    setShowDeleteModal(false);
+  };
+
+  const handleReserveClick = (service) => {
+    const token = AsyncStorage.getItem('jwtToken');
+    if (!token) {
+      Alert.alert('Greška', 'Morate biti prijavljeni da biste rezervisali termin.');
+      return;
+    }
+    
+    if (!service) {
+      Alert.alert('Greška', 'Nepoznata usluga');
+      return;
+    }
+    setSelectedService(service);
+    setIsAppointmentModalOpen(true);
+  };
+
+  const handlePriceChangeClick = (id) => {
+    setSelectedServiceId(id);
+    setShowPriceModal(true);
+  };
+
   const handleUpdatePrice = async () => {
     if (!newPrice || isNaN(newPrice)) {
       Alert.alert('Greška', 'Unesite validnu cenu.');
       return;
     }
 
+    const token = await AsyncStorage.getItem('jwtToken');
+    if (!token || !isTokenValid(token)) {
+      Alert.alert('Greška', 'Sesija je istekla. Molimo prijavite se ponovo.');
+      return;
+    }
+
     try {
-      const token = await AsyncStorage.getItem('jwtToken');
       const response = await fetch(
         `https://klinikabackend-production.up.railway.app/api/Service/${selectedServiceId}/price`,
         {
@@ -280,6 +284,12 @@ export default function Services() {
       );
 
       if (!response.ok) {
+        if (response.status === 401) {
+          Alert.alert('Greška', 'Sesija je istekla. Molimo prijavite se ponovo.');
+          await AsyncStorage.removeItem('jwtToken');
+          setRole('');
+          return;
+        }
         Alert.alert('Greška', 'Greška pri ažuriranju cene usluge.');
         return;
       }
@@ -301,18 +311,81 @@ export default function Services() {
     }
   };
 
-  const handleReserveClick = (service) => {
-    if (role === '') {
-      Alert.alert('Greška', 'Morate biti prijavljeni da biste rezervisali termin.');
+  const handleAddCategory = async () => {
+    if (!name || !description) {
+      setErrorMessage('Molimo popunite sva polja.');
       return;
     }
-    if (!service) {
-      Alert.alert('Greška', 'Nepoznata usluga');
+    if (name.length < 3) {
+      setErrorMessage('Naziv kategorije mora biti najmanje 3 karaktera.');
       return;
     }
-    setSelectedService(service);
-    setShowAppointmentModal(true);
+
+    if (description.length < 3) {
+      setErrorMessage('Opis kategorije mora biti najmanje 3 karaktera.');
+      return;
+    }
+
+    const token = await AsyncStorage.getItem('jwtToken');
+    if (!token || !isTokenValid(token)) {
+      Alert.alert('Greška', 'Sesija je istekla. Molimo prijavite se ponovo.');
+      return;
+    }
+
+    try {
+      const checkResponse = await fetch(
+        `https://klinikabackend-production.up.railway.app/api/ServiceCategory/exists?name=${encodeURIComponent(
+          name
+        )}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!checkResponse.ok) {
+        throw new Error('Greška prilikom provere postojanja kategorije.');
+      }
+
+      const categoryExists = await checkResponse.json();
+      if (categoryExists) {
+        Alert.alert('Greška', 'Kategorija sa ovim imenom već postoji.');
+        return;
+      }
+
+      const response = await fetch(
+        'https://klinikabackend-production.up.railway.app/api/ServiceCategory',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ name, description }),
+        }
+      );
+
+      if (response.ok) {
+        const newCategory = await response.json();
+        setCategories((prevCategories) => [...prevCategories, newCategory]);
+        setShowModal2(false);
+        setName('');
+        setDescription('');
+        setErrorMessage('');
+        Alert.alert('Uspeh', 'Kategorija uspešno dodata!');
+      } else {
+        Alert.alert('Greška', 'Greška prilikom dodavanja kategorije.');
+      }
+    } catch (error) {
+      console.error('Greška:', error);
+    }
   };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
 
   const filteredAndSortedServices = services
     .filter((service) => {
@@ -337,165 +410,40 @@ export default function Services() {
       }
     });
 
-  const renderAddServiceModal = () => (
-    <Modal
-      visible={showAddServiceModal}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={() => setShowAddServiceModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Dodaj novu uslugu</Text>
+  const renderServiceItem = ({ item }) => (
+    <View style={styles.serviceCard}>
+      <View style={styles.serviceCardHeader}>
+        <Text style={styles.serviceName}>{item.name}</Text>
+        {role === 'Admin' && (
+          <View style={styles.serviceCardActions}>
             <TouchableOpacity
-              onPress={() => setShowAddServiceModal(false)}
-              style={styles.closeButton}
+              style={styles.iconButton}
+              onPress={() => handlePriceChangeClick(item.id)}
             >
-              <X size={24} color="#666" />
+              <Pencil size={18} color="#007AFF" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => handleDeleteClick(item.id)}
+            >
+              <Trash2 size={18} color="#FF3B30" />
             </TouchableOpacity>
           </View>
-          
-          <ScrollView style={styles.modalBody}>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Naziv:</Text>
-              <TextInput
-                style={styles.textInput}
-                value={newService.name}
-                onChangeText={(text) =>
-                  setNewService({ ...newService, name: text })
-                }
-                placeholder="Unesite naziv usluge..."
-                placeholderTextColor="#999"
-              />
-            </View>
-            
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Opis:</Text>
-              <TextInput
-                style={[styles.textInput, styles.textArea]}
-                multiline
-                numberOfLines={4}
-                value={newService.description}
-                onChangeText={(text) =>
-                  setNewService({ ...newService, description: text })
-                }
-                placeholder="Unesite opis usluge..."
-                placeholderTextColor="#999"
-              />
-            </View>
-            
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Cena:</Text>
-              <TextInput
-                style={styles.textInput}
-                value={newService.price}
-                onChangeText={(text) =>
-                  setNewService({ ...newService, price: text })
-                }
-                placeholder="Unesite cenu..."
-                placeholderTextColor="#999"
-                keyboardType="numeric"
-              />
-            </View>
-            
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Kategorija:</Text>
-              <View style={styles.pickerContainer}>
-                {categories.map((category) => (
-                  <TouchableOpacity
-                    key={category.id}
-                    style={[
-                      styles.categoryOption,
-                      newService.categoryId === category.id && styles.selectedCategory,
-                    ]}
-                    onPress={() =>
-                      setNewService({ ...newService, categoryId: category.id })
-                    }
-                  >
-                    <Text
-                      style={[
-                        styles.categoryOptionText,
-                        newService.categoryId === category.id && styles.selectedCategoryText,
-                      ]}
-                    >
-                      {category.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            
-            <TouchableOpacity
-              style={styles.submitButton}
-              onPress={handleAddService}
-            >
-              <Text style={styles.submitButtonText}>Dodaj uslugu</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
+        )}
       </View>
-    </Modal>
-  );
-
-  const renderAddCategoryModal = () => (
-    <Modal
-      visible={showAddCategoryModal}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={() => setShowAddCategoryModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Dodaj novu kategoriju</Text>
-            <TouchableOpacity
-              onPress={() => setShowAddCategoryModal(false)}
-              style={styles.closeButton}
-            >
-              <X size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView style={styles.modalBody}>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Naziv:</Text>
-              <TextInput
-                style={styles.textInput}
-                value={newCategory.name}
-                onChangeText={(text) =>
-                  setNewCategory({ ...newCategory, name: text })
-                }
-                placeholder="Unesite naziv kategorije..."
-                placeholderTextColor="#999"
-              />
-            </View>
-            
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Opis:</Text>
-              <TextInput
-                style={[styles.textInput, styles.textArea]}
-                multiline
-                numberOfLines={4}
-                value={newCategory.description}
-                onChangeText={(text) =>
-                  setNewCategory({ ...newCategory, description: text })
-                }
-                placeholder="Unesite opis kategorije..."
-                placeholderTextColor="#999"
-              />
-            </View>
-            
-            <TouchableOpacity
-              style={styles.submitButton}
-              onPress={handleAddCategory}
-            >
-              <Text style={styles.submitButtonText}>Dodaj kategoriju</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
+      <Text style={styles.serviceDescription}>{item.description}</Text>
+      <View style={styles.priceContainer}>
+        <Text style={styles.servicePrice}>{item.price} RSD</Text>
       </View>
-    </Modal>
+      {role !== 'Admin' && (
+        <TouchableOpacity
+          style={styles.reserveButton}
+          onPress={() => handleReserveClick(item)}
+        >
+          <Text style={styles.reserveButtonText}>Rezerviši termin</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 
   if (loading) {
@@ -514,6 +462,9 @@ export default function Services() {
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Greška: {error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchServices}>
+            <Text style={styles.retryButtonText}>Pokušaj ponovo</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -521,154 +472,274 @@ export default function Services() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+      <View style={styles.container}>
+        <View style={styles.headerSection}>
           <Text style={styles.title}>Naše usluge</Text>
           
-          {/* Search and Sort */}
           <View style={styles.filtersSection}>
             <View style={styles.searchContainer}>
-              <Search size={20} color="#666" style={styles.searchIcon} />
+              <Search size={20} color="#9CA3AF" style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Pretraži usluge..."
-                placeholderTextColor="#999"
+                placeholderTextColor="#9CA3AF"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
             </View>
             
             <View style={styles.sortContainer}>
-              <TouchableOpacity
-                style={styles.sortButton}
-                onPress={() => {
-                  const sortOptions = [
-                    { label: 'Bez sortiranja', value: 'none' },
-                    { label: 'Cena (rastuće)', value: 'priceAsc' },
-                    { label: 'Cena (opadajuće)', value: 'priceDesc' },
-                    { label: 'Naziv (A-Z)', value: 'nameAsc' },
-                    { label: 'Naziv (Z-A)', value: 'nameDesc' },
-                  ];
-                  
-                  Alert.alert(
-                    'Sortiraj po',
-                    '',
-                    sortOptions.map(option => ({
-                      text: option.label,
-                      onPress: () => setSortType(option.value),
-                    }))
-                  );
-                }}
+              <Picker
+                selectedValue={sortType}
+                style={styles.sortPicker}
+                onValueChange={(itemValue) => setSortType(itemValue)}
               >
-                <ArrowUpDown size={20} color="#007AFF" />
-                <Text style={styles.sortButtonText}>Sortiraj</Text>
-              </TouchableOpacity>
+                <Picker.Item label="Sortiraj po..." value="none" />
+                <Picker.Item label="Cena (rastuće)" value="priceAsc" />
+                <Picker.Item label="Cena (opadajuće)" value="priceDesc" />
+                <Picker.Item label="Naziv (A-Z)" value="nameAsc" />
+                <Picker.Item label="Naziv (Z-A)" value="nameDesc" />
+              </Picker>
             </View>
           </View>
-          
-          {/* Admin Buttons */}
+
           {role === 'Admin' && (
-            <View style={styles.adminButtons}>
+            <View style={styles.adminButtonsContainer}>
               <TouchableOpacity
                 style={styles.addButton}
-                onPress={() => setShowAddServiceModal(true)}
+                onPress={() => setShowModal(true)}
               >
-                <Plus size={20} color="#ffffff" />
-                <Text style={styles.addButtonText}>Dodaj uslugu</Text>
+                <Text style={styles.addButtonText}>Dodaj novu uslugu</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => setShowAddCategoryModal(true)}
+                style={[styles.addButton, styles.secondaryButton]}
+                onPress={() => setShowModal2(true)}
               >
-                <Plus size={20} color="#ffffff" />
-                <Text style={styles.addButtonText}>Dodaj kategoriju</Text>
+                <Text style={styles.addButtonText}>Dodaj novu kategoriju</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
 
-        {/* Services Grid */}
         {filteredAndSortedServices.length === 0 ? (
           <View style={styles.noServicesContainer}>
-            <Text style={styles.noServicesText}>Nema pronađenih usluga.</Text>
+            <Text style={styles.noServices}>Nema pronađenih usluga</Text>
           </View>
         ) : (
-          <View style={styles.servicesGrid}>
-            {filteredAndSortedServices.map((service) => (
-              <View key={service.id} style={styles.serviceCard}>
-                <View style={styles.serviceCardHeader}>
-                  <Text style={styles.serviceTitle}>{service.name}</Text>
-                  {role === 'Admin' && (
-                    <View style={styles.serviceActions}>
-                      <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => {
-                          setSelectedServiceId(service.id);
-                          setShowPriceModal(true);
-                        }}
-                      >
-                        <Pencil size={18} color="#007AFF" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => {
-                          setSelectedServiceId(service.id);
-                          setShowDeleteModal(true);
-                        }}
-                      >
-                        <Trash2 size={18} color="#dc2626" />
-                      </TouchableOpacity>
-                    </View>
-                  )}
+          <FlatList
+            data={filteredAndSortedServices}
+            renderItem={renderServiceItem}
+            keyExtractor={(item) => item.id.toString()}
+            numColumns={1}
+            contentContainerStyle={styles.servicesList}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </View>
+
+      {/* Add Service Modal */}
+      <Modal
+        visible={showModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowModal(false)}
+      >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Dodaj novu uslugu</Text>
+                  <TouchableOpacity 
+                    style={styles.closeButton}
+                    onPress={() => setShowModal(false)}
+                  >
+                    <X size={24} color="#6B7280" />
+                  </TouchableOpacity>
                 </View>
                 
-                <Text style={styles.serviceDescription}>{service.description}</Text>
-                <Text style={styles.servicePrice}>Cena: {service.price} RSD</Text>
-                
-                {role !== 'Admin' && (
-                  <TouchableOpacity
-                    style={styles.reserveButton}
-                    onPress={() => handleReserveClick(service)}
-                  >
-                    <Calendar size={18} color="#ffffff" />
-                    <Text style={styles.reserveButtonText}>Rezerviši termin</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
+                <ScrollView 
+                  style={styles.modalScrollView}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Naziv usluge</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="Unesite naziv usluge"
+                      placeholderTextColor="#9CA3AF"
+                      value={newService.name}
+                      onChangeText={(text) => setNewService({ ...newService, name: text })}
+                      returnKeyType="next"
+                    />
+                  </View>
+                  
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Opis usluge</Text>
+                    <TextInput
+                      style={[styles.modalInput, styles.textArea]}
+                      placeholder="Unesite opis usluge"
+                      placeholderTextColor="#9CA3AF"
+                      value={newService.description}
+                      onChangeText={(text) => setNewService({ ...newService, description: text })}
+                      multiline
+                      numberOfLines={4}
+                      returnKeyType="next"
+                    />
+                  </View>
+                  
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Cena (RSD)</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="Unesite cenu"
+                      placeholderTextColor="#9CA3AF"
+                      value={newService.price}
+                      onChangeText={(text) => setNewService({ ...newService, price: text })}
+                      keyboardType="numeric"
+                      returnKeyType="done"
+                    />
+                  </View>
+                  
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Kategorija</Text>
+                    <View style={styles.pickerContainer}>
+                      <Picker
+                        selectedValue={newService.categoryId}
+                        style={styles.modalPicker}
+                        onValueChange={(itemValue) => setNewService({ ...newService, categoryId: itemValue })}
+                      >
+                        <Picker.Item label="Izaberite kategoriju" value="" />
+                        {categories.map((category) => (
+                          <Picker.Item key={category.id} label={category.name} value={category.id} />
+                        ))}
+                      </Picker>
+                    </View>
+                  </View>
+                </ScrollView>
 
-      {/* Modals */}
-      {renderAddServiceModal()}
-      {renderAddCategoryModal()}
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity style={styles.modalButton} onPress={handleAddService}>
+                    <Text style={styles.modalButtonText}>Dodaj uslugu</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.modalButton, styles.cancelButton]} 
+                    onPress={() => setShowModal(false)}
+                  >
+                    <Text style={styles.modalButtonText}>Otkaži</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Add Category Modal */}
+      <Modal
+        visible={showModal2}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowModal2(false)}
+      >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Dodaj novu kategoriju</Text>
+                  <TouchableOpacity 
+                    style={styles.closeButton}
+                    onPress={() => setShowModal2(false)}
+                  >
+                    <X size={24} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+                
+                <ScrollView 
+                  style={styles.modalScrollView}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Naziv kategorije</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="Unesite naziv kategorije"
+                      placeholderTextColor="#9CA3AF"
+                      value={name}
+                      onChangeText={setName}
+                      returnKeyType="next"
+                    />
+                  </View>
+                  
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Opis kategorije</Text>
+                    <TextInput
+                      style={[styles.modalInput, styles.textArea]}
+                      placeholder="Unesite opis kategorije"
+                      placeholderTextColor="#9CA3AF"
+                      value={description}
+                      onChangeText={setDescription}
+                      multiline
+                      numberOfLines={4}
+                      returnKeyType="done"
+                    />
+                  </View>
+
+                  {errorMessage && (
+                    <Text style={styles.errorMessage}>{errorMessage}</Text>
+                  )}
+                </ScrollView>
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity style={styles.modalButton} onPress={handleAddCategory}>
+                    <Text style={styles.modalButtonText}>Dodaj kategoriju</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.modalButton, styles.cancelButton]} 
+                    onPress={() => setShowModal2(false)}
+                  >
+                    <Text style={styles.modalButtonText}>Otkaži</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Delete Confirmation Modal */}
       <Modal
         visible={showDeleteModal}
+        transparent
         animationType="fade"
-        transparent={true}
-        onRequestClose={() => setShowDeleteModal(false)}
+        onRequestClose={cancelDelete}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.confirmationModal}>
-            <Text style={styles.confirmationTitle}>
-              Da li ste sigurni da želite da obrišete ovu uslugu?
-            </Text>
-            <View style={styles.confirmationButtons}>
-              <TouchableOpacity
-                style={[styles.confirmButton, styles.confirmButtonYes]}
-                onPress={handleDeleteService}
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Potvrda brisanja</Text>
+            <Text style={styles.modalText}>Da li ste sigurni da želite da obrišete ovu uslugu?</Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.deleteButton]} 
+                onPress={confirmDelete}
               >
-                <Text style={styles.confirmButtonText}>Da</Text>
+                <Text style={styles.modalButtonText}>Obriši</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.confirmButton, styles.confirmButtonNo]}
-                onPress={() => setShowDeleteModal(false)}
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={cancelDelete}
               >
-                <Text style={styles.confirmButtonText}>Ne</Text>
+                <Text style={styles.modalButtonText}>Otkaži</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -678,168 +749,154 @@ export default function Services() {
       {/* Price Update Modal */}
       <Modal
         visible={showPriceModal}
-        animationType="fade"
-        transparent={true}
+        transparent
+        animationType="slide"
         onRequestClose={() => setShowPriceModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.confirmationModal}>
-            <Text style={styles.confirmationTitle}>Ažuriraj cenu</Text>
-            <TextInput
-              style={styles.priceInput}
-              value={newPrice}
-              onChangeText={setNewPrice}
-              placeholder="Unesite novu cenu"
-              placeholderTextColor="#999"
-              keyboardType="numeric"
-            />
-            <View style={styles.confirmationButtons}>
-              <TouchableOpacity
-                style={[styles.confirmButton, styles.confirmButtonYes]}
-                onPress={handleUpdatePrice}
-              >
-                <Text style={styles.confirmButtonText}>Sačuvaj</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.confirmButton, styles.confirmButtonNo]}
-                onPress={() => setShowPriceModal(false)}
-              >
-                <Text style={styles.confirmButtonText}>Otkaži</Text>
-              </TouchableOpacity>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Ažuriraj cenu</Text>
+                  <TouchableOpacity 
+                    style={styles.closeButton}
+                    onPress={() => setShowPriceModal(false)}
+                  >
+                    <X size={24} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>Nova cena (RSD)</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Unesite novu cenu"
+                    placeholderTextColor="#9CA3AF"
+                    value={newPrice}
+                    onChangeText={setNewPrice}
+                    keyboardType="numeric"
+                    returnKeyType="done"
+                  />
+                </View>
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity style={styles.modalButton} onPress={handleUpdatePrice}>
+                    <Text style={styles.modalButtonText}>Sačuvaj</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.modalButton, styles.cancelButton]} 
+                    onPress={() => setShowPriceModal(false)}
+                  >
+                    <Text style={styles.modalButtonText}>Otkaži</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
-          </View>
-        </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F8FAFC',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#dc2626',
-    textAlign: 'center',
-  },
-  header: {
-    padding: 24,
-    paddingTop: 60,
+  headerSection: {
+    backgroundColor: 'white',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
   },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#1a1a1a',
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#1E293B',
     textAlign: 'center',
-    marginBottom: 32,
-  },
-  filtersSection: {
-    flexDirection: 'row',
-    gap: 12,
     marginBottom: 24,
   },
+  filtersSection: {
+    marginBottom: 20,
+  },
   searchContainer: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#F8FAFC',
     borderRadius: 12,
     paddingHorizontal: 16,
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    height: 50,
   },
   searchIcon: {
     marginRight: 12,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 12,
     fontSize: 16,
-    color: '#1a1a1a',
+    color: '#1E293B',
   },
   sortContainer: {
-    minWidth: 100,
-  },
-  sortButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#F8FAFC',
     borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-    gap: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
   },
-  sortButtonText: {
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '500',
+  sortPicker: {
+    height: 50,
+    color: '#1E293B',
   },
-  adminButtons: {
-    flexDirection: 'row',
+  adminButtonsContainer: {
     gap: 12,
-    marginBottom: 24,
   },
   addButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#007AFF',
     borderRadius: 12,
     paddingVertical: 16,
-    gap: 8,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  secondaryButton: {
+    backgroundColor: '#10B981',
+    shadowColor: '#10B981',
   },
   addButtonText: {
-    color: '#ffffff',
+    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
-  noServicesContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 48,
-  },
-  noServicesText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#666',
-    textAlign: 'center',
-  },
-  servicesGrid: {
-    padding: 24,
-    gap: 16,
+  servicesList: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
   },
   serviceCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   serviceCardHeader: {
     flexDirection: 'row',
@@ -847,184 +904,248 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 12,
   },
-  serviceTitle: {
-    fontSize: 18,
+  serviceName: {
+    fontSize: 20,
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: '#007AFF',
     flex: 1,
     marginRight: 12,
   },
-  serviceActions: {
+  serviceCardActions: {
     flexDirection: 'row',
     gap: 8,
   },
-  actionButton: {
+  iconButton: {
     padding: 8,
     borderRadius: 8,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F1F5F9',
   },
   serviceDescription: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-    marginBottom: 12,
+    fontSize: 15,
+    color: '#64748B',
+    marginBottom: 16,
+    lineHeight: 22,
+  },
+  priceContainer: {
+    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginBottom: 16,
+    alignSelf: 'flex-start',
   },
   servicePrice: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#007AFF',
-    marginBottom: 16,
+    color: '#0369A1',
   },
   reserveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#007AFF',
     borderRadius: 12,
-    paddingVertical: 12,
-    gap: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   reserveButtonText: {
-    color: '#ffffff',
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  noServicesContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  noServices: {
+    fontSize: 18,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#64748B',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    backgroundColor: '#F8FAFC',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#DC2626',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+  },
+  retryButtonText: {
+    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    paddingHorizontal: 16,
   },
   modalContent: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    width: '100%',
-    maxHeight: '80%',
+    backgroundColor: 'white',
+    borderRadius: 24,
+    padding: 0,
+    minWidth: '98%',
+    maxWidth: 800,
+    maxHeight: '85%',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
     shadowRadius: 20,
-    elevation: 20,
+    elevation: 12,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 24,
+    paddingHorizontal: 28,
+    paddingTop: 28,
+    paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E7',
+    borderBottomColor: '#E2E8F0',
+    backgroundColor: '#FAFBFC',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1E293B',
+    flex: 1,
   },
   closeButton: {
     padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
   },
-  modalBody: {
-    padding: 24,
+  modalScrollView: {
+    paddingHorizontal: 28,
+    paddingVertical: 24,
+    minHeight: 200,
   },
-  formGroup: {
+  modalText: {
+    fontSize: 18,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 26,
+    paddingHorizontal: 28,
+    paddingTop: 24,
+  },
+  inputContainer: {
     marginBottom: 24,
   },
-  label: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1a1a1a',
-    marginBottom: 12,
+  inputLabel: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 10,
   },
-  textInput: {
-    borderWidth: 2,
-    borderColor: '#E5E5E7',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#1a1a1a',
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    fontSize: 17,
+    color: '#1E293B',
+    backgroundColor: 'white',
+    minHeight: 52,
   },
   textArea: {
     minHeight: 120,
     textAlignVertical: 'top',
+    paddingTop: 16,
   },
   pickerContainer: {
-    gap: 8,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 14,
+    backgroundColor: 'white',
+    overflow: 'hidden',
+    minHeight: 52,
   },
-  categoryOption: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#E5E5E7',
-    backgroundColor: '#ffffff',
+  modalPicker: {
+    height: 52,
+    color: '#1E293B',
   },
-  selectedCategory: {
-    borderColor: '#007AFF',
-    backgroundColor: '#f0f8ff',
-  },
-  categoryOptionText: {
-    fontSize: 16,
-    color: '#1a1a1a',
-    textAlign: 'center',
-  },
-  selectedCategoryText: {
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  submitButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  submitButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  confirmationModal: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
-  },
-  confirmationTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  confirmationButtons: {
+  modalButtons: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 16,
+    paddingHorizontal: 28,
+    paddingBottom: 28,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    backgroundColor: '#FAFBFC',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
-  confirmButton: {
+  modalButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: '#007AFF',
+    borderRadius: 14,
+    paddingVertical: 16,
     alignItems: 'center',
+    minHeight: 52,
+    justifyContent: 'center',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  confirmButtonYes: {
-    backgroundColor: '#dc2626',
+  cancelButton: {
+    backgroundColor: '#6B7280',
+    shadowColor: '#6B7280',
   },
-  confirmButtonNo: {
-    backgroundColor: '#6b7280',
+  deleteButton: {
+    backgroundColor: '#DC2626',
+    shadowColor: '#DC2626',
   },
-  confirmButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
+  modalButtonText: {
+    color: 'white',
+    fontSize: 17,
     fontWeight: '600',
   },
-  priceInput: {
-    borderWidth: 2,
-    borderColor: '#E5E5E7',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#1a1a1a',
-    marginBottom: 24,
+  errorMessage: {
+    color: '#DC2626',
+    fontSize: 15,
+    marginBottom: 20,
     textAlign: 'center',
+    backgroundColor: '#FEF2F2',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FECACA',
   },
 });
+
+export default Services;

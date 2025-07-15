@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Image,
 } from 'react-native';
 import { Lock, Eye, EyeOff, Edit3 } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserRoleFromToken, getUserIdFromToken, decodeJWTToken } from '@/utils/tokenUtils';
 import AllAppointmentsModal from '@/components/AllAppointmentsModal';
@@ -44,48 +45,87 @@ const Profile = () => {
   const [isMedicalRecordModalOpen, setIsMedicalRecordModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const token = await AsyncStorage.getItem('jwtToken');
-        const response = await fetch(
-          'https://klinikabackend-production.up.railway.app/api/Auth/GetUserData',
-          {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          setUser({
-            ime: data.firstName || 'nepoznato',
-            prezime: data.lastName || 'nepoznato',
-            email: data.email || 'nepoznato',
-            biography: data.biography || '',
-            profileImagePath: data.profileImagePath || '',
-          });
-        } else {
-          console.error('Greška prilikom učitavanja podataka o korisniku');
-        }
-
-        if (token) {
-          const roles = getUserRoleFromToken(token);
-          setRole(roles);
-          if (roles.includes('Doctor')) {
-            const doctorId = getUserIdFromToken(token);
-            setDoctorId(doctorId);
-          }
-        }
-      } catch (error) {
-        console.error('Greška prilikom poziva API-ja:', error);
+  const fetchUserData = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem('jwtToken');
+      
+      if (!token) {
+        // Resetuj state ako nema token
+        setUser({
+          ime: '',
+          prezime: '',
+          email: '',
+          biography: '',
+          profileImagePath: '',
+        });
+        setRole('');
+        setDoctorId('');
+        setAppointments([]);
+        return;
       }
-    };
 
-    fetchUserData();
+      const response = await fetch(
+        'https://klinikabackend-production.up.railway.app/api/Auth/GetUserData',
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setUser({
+          ime: data.firstName || 'nepoznato',
+          prezime: data.lastName || 'nepoznato',
+          email: data.email || 'nepoznato',
+          biography: data.biography || '',
+          profileImagePath: data.profileImagePath || '',
+        });
+      } else {
+        console.error('Greška prilikom učitavanja podataka o korisniku');
+        // Resetuj state ako je greška
+        setUser({
+          ime: '',
+          prezime: '',
+          email: '',
+          biography: '',
+          profileImagePath: '',
+        });
+      }
+
+      // Uvek refresh-uj role i doctorId
+      const roles = getUserRoleFromToken(token);
+      setRole(roles);
+      if (roles.includes('Doctor')) {
+        const doctorId = getUserIdFromToken(token);
+        setDoctorId(doctorId);
+      } else {
+        setDoctorId('');
+      }
+    } catch (error) {
+      console.error('Greška prilikom poziva API-ja:', error);
+      // Resetuj state ako je greška
+      setUser({
+        ime: '',
+        prezime: '',
+        email: '',
+        biography: '',
+        profileImagePath: '',
+      });
+      setRole('');
+      setDoctorId('');
+      setAppointments([]);
+    }
   }, []);
+
+  // Koristi useFocusEffect umesto useEffect da se podaci učitaju svaki put kad se fokusira na tab
+  useFocusEffect(
+    useCallback(() => {
+      fetchUserData();
+    }, [fetchUserData])
+  );
 
   const fetchAppointments = async () => {
     const token = await AsyncStorage.getItem('jwtToken');
@@ -270,6 +310,17 @@ const Profile = () => {
           onPress: async () => {
             try {
               await AsyncStorage.removeItem('jwtToken');
+              // Resetuj state nakon odjave
+              setUser({
+                ime: '',
+                prezime: '',
+                email: '',
+                biography: '',
+                profileImagePath: '',
+              });
+              setRole('');
+              setDoctorId('');
+              setAppointments([]);
               console.log('User logged out');
             } catch (error) {
               console.error('Error during logout:', error);
@@ -285,7 +336,7 @@ const Profile = () => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.profileContainer}>
           <Text style={styles.title}>Moj profil</Text>
-          
+
           {user.profileImagePath ? (
             <Image source={{ uri: user.profileImagePath }} style={styles.profileImage} />
           ) : null}
