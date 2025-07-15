@@ -489,17 +489,24 @@ const Services = () => {
             </View>
             
             <View style={styles.sortContainer}>
-              <Picker
-                selectedValue={sortType}
-                style={styles.sortPicker}
-                onValueChange={(itemValue) => setSortType(itemValue)}
-              >
-                <Picker.Item label="Sortiraj po..." value="none" />
-                <Picker.Item label="Cena (rastuće)" value="priceAsc" />
-                <Picker.Item label="Cena (opadajuće)" value="priceDesc" />
-                <Picker.Item label="Naziv (A-Z)" value="nameAsc" />
-                <Picker.Item label="Naziv (Z-A)" value="nameDesc" />
-              </Picker>
+              
+              <View style={styles.sortPickerWrapper}>
+              
+              <View style={styles.sortPickerWrapper}>
+                <Picker
+                  selectedValue={sortType}
+                  onValueChange={(itemValue) => setSortType(itemValue)}
+                  itemStyle={styles.pickerItem}
+                  
+                >
+                  <Picker.Item label="Sortiraj po..." value="none" />
+                  <Picker.Item label="Cena (rastuće)" value="priceAsc" />
+                  <Picker.Item label="Cena (opadajuće)" value="priceDesc" />
+                  <Picker.Item label="Naziv (A-Z)" value="nameAsc" />
+                  <Picker.Item label="Naziv (Z-A)" value="nameDesc" />
+                </Picker>
+              </View>
+              </View>
             </View>
           </View>
 
@@ -613,6 +620,7 @@ const Services = () => {
                         selectedValue={newService.categoryId}
                         style={styles.modalPicker}
                         onValueChange={(itemValue) => setNewService({ ...newService, categoryId: itemValue })}
+                        itemStyle={styles.pickerItem}
                       >
                         <Picker.Item label="Izaberite kategoriju" value="" />
                         {categories.map((category) => (
@@ -846,15 +854,52 @@ const styles = StyleSheet.create({
     color: '#1E293B',
   },
   sortContainer: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'white',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  sortLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 4,
+  },
+  sortPickerWrapper: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  sortLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  sortPickerWrapper: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     overflow: 'hidden',
+    minHeight: 60,
   },
   sortPicker: {
-    height: 50,
+    height: 60,
     color: '#1E293B',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  pickerItem: {
+    fontSize: 16,
+    color: '#1E293B',
+    backgroundColor: 'white',
+    height: 60,
   },
   adminButtonsContainer: {
     gap: 12,
@@ -1095,6 +1140,7 @@ const styles = StyleSheet.create({
   modalPicker: {
     height: 52,
     color: '#1E293B',
+    fontSize: 16,
   },
   modalButtons: {
     flexDirection: 'row',

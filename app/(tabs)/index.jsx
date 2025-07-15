@@ -14,17 +14,11 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  Clock,
-  MapPin,
-  Phone,
-  Heart,
-  Users,
-  Calendar,
-  CheckCircle2,
-} from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { Clock, MapPin, Phone, Heart, Users, Calendar, CircleCheck as CheckCircle2 } from 'lucide-react-native';
 import ImageSlider from '@/components/Home/ImageSlider';
 import ReviewSection from '@/components/Home/ReviewSection';
+import { getUserRoleFromToken, isTokenValid } from '@/utils/tokenUtils';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -36,6 +30,7 @@ export default function Home() {
   const [reviews, setReviews] = useState([]);
   const [userRole, setUserRole] = useState('');
   const [showSplash, setShowSplash] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const slides = [
     {
@@ -66,22 +61,44 @@ export default function Home() {
     { day: 'Nedelja', hours: 'Zatvoreno' },
   ];
 
-  const checkUserRole = async () => {
+  const checkUserRole = React.useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
-      if (token) {
-        const payload = token.split('.')[1];
-        const decodedPayload = JSON.parse(atob(payload));
-        const roles =
-          decodedPayload[
-            'http://schemas.microsoft.com/ws/2008/06/identity/claims/role'
-          ] || '';
-        setUserRole(roles);
+      console.log('Checking user role, token exists:', !!token);
+      
+      if (token && isTokenValid(token)) {
+        const role = getUserRoleFromToken(token);
+        console.log('User role from token:', role);
+        setUserRole(role);
+        setIsLoggedIn(true);
+      } else {
+        console.log('No token found or invalid, setting as User');
+        setUserRole('');
+        setIsLoggedIn(false);
       }
     } catch (error) {
-      setError('Error decoding token.');
+      console.error('Error checking user role:', error);
+      setUserRole('');
+      setIsLoggedIn(false);
     }
-  };
+  }, []);
+
+  // Check auth status when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!showSplash) {
+        checkUserRole();
+      }
+    }, [checkUserRole, showSplash])
+  );
+
+  // Also check periodically for auth changes
+  useEffect(() => {
+    if (!showSplash) {
+      const interval = setInterval(checkUserRole, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [checkUserRole, showSplash]);
 
   const fetchServices = async () => {
     setLoading(true);
@@ -125,6 +142,11 @@ export default function Home() {
   const handleAddReview = async (newReview) => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
+      if (!token || !isTokenValid(token)) {
+        Alert.alert('Greška', 'Sesija je istekla. Molimo prijavite se ponovo.');
+        return;
+      }
+
       const response = await fetch(
         'https://klinikabackend-production.up.railway.app/api/Review',
         {
@@ -146,8 +168,8 @@ export default function Home() {
         return;
       }
 
-      setReviews((prevReviews) => [...prevReviews, newReview]);
-      fetchReviews();
+      const addedReview = await response.json();
+      setReviews((prevReviews) => [...prevReviews, addedReview]);
       Alert.alert('Uspeh', 'Recenzija je uspešno dodata!');
     } catch (error) {
       console.error('Greška prilikom dodavanja recenzije:', error);
@@ -155,10 +177,37 @@ export default function Home() {
     }
   };
 
-  const handleDeleteReview = (reviewId) => {
-    setReviews((prevReviews) =>
-      prevReviews.filter((review) => review.id !== reviewId)
-    );
+  const handleDeleteReview = async (reviewId) => {
+    try {
+      const token = await AsyncStorage.getItem('jwtToken');
+      if (!token || !isTokenValid(token)) {
+        Alert.alert('Greška', 'Sesija je istekla. Molimo prijavite se ponovo.');
+        return;
+      }
+
+      const response = await fetch(
+        `https://klinikabackend-production.up.railway.app/api/Review/${reviewId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        Alert.alert('Greška', 'Greška prilikom brisanja recenzije.');
+        return;
+      }
+
+      setReviews((prevReviews) =>
+        prevReviews.filter((review) => review.id !== reviewId)
+      );
+      Alert.alert('Uspeh', 'Recenzija je uspešno obrisana!');
+    } catch (error) {
+      console.error('Greška prilikom brisanja recenzije:', error);
+      Alert.alert('Greška', 'Došlo je do greške prilikom brisanja recenzije.');
+    }
   };
 
   const openMap = () => {
@@ -337,6 +386,7 @@ export default function Home() {
           onAddReview={handleAddReview}
           onDeleteReview={handleDeleteReview}
           role={userRole}
+          isLoggedIn={isLoggedIn}
         />
       </ScrollView>
     </SafeAreaView>

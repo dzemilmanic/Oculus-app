@@ -9,14 +9,19 @@ import {
   Alert,
   Modal,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Star, Plus, X, Trash2 } from 'lucide-react-native';
+import { isTokenValid, decodeJWTToken } from '@/utils/tokenUtils';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-export default function ReviewSection({ reviews, onAddReview, onDeleteReview, role }) {
+export default function ReviewSection({ reviews, onAddReview, onDeleteReview, role, isLoggedIn }) {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newReview, setNewReview] = useState({ rating: 0, content: '' });
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -59,18 +64,17 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
 
     try {
       const token = await AsyncStorage.getItem('jwtToken');
-      if (token) {
-        // Decode token to get user info
-        const payload = token.split('.')[1];
-        const decodedPayload = JSON.parse(atob(payload));
-        const authorName = `${decodedPayload.FirstName || 'nepoznato'} ${
-          decodedPayload.LastName || 'nepoznato'
+      if (token && isTokenValid(token)) {
+        const payload = decodeJWTToken(token);
+        const authorName = `${payload.FirstName || 'Nepoznato'} ${
+          payload.LastName || 'Nepoznato'
         }`;
         
         const reviewWithAuthor = { ...newReview, authorName };
         await onAddReview(reviewWithAuthor);
         setNewReview({ rating: 0, content: '' });
         setIsModalVisible(false);
+        setUserHasReview(true);
       }
     } catch (error) {
       Alert.alert('Greška', 'Došlo je do greške prilikom dodavanja recenzije.');
@@ -92,10 +96,11 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
     );
   };
 
-  const checkIfUserHasReview = async () => {
+  const checkUserStatus = async () => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
-      if (token) {
+      if (token && isTokenValid(token)) {
+        // Proveri da li korisnik već ima recenziju
         const response = await fetch(
           'https://klinikabackend-production.up.railway.app/api/Review/user-review',
           {
@@ -110,15 +115,44 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
           const data = await response.json();
           setUserHasReview(data.hasReview);
         }
+      } else {
+        setUserHasReview(false);
       }
     } catch (error) {
-      console.error('Greška pri proveri recenzije:', error);
+      console.error('Greška pri proveri statusa korisnika:', error);
+      setUserHasReview(false);
     }
   };
 
+  const handleAddReviewPress = () => {
+    if (!isLoggedIn) {
+      Alert.alert(
+        'Potrebna prijava',
+        'Morate biti prijavljeni da biste napisali recenziju.',
+        [{ text: 'U redu', style: 'default' }]
+      );
+      return;
+    }
+    
+    if (userHasReview) {
+      Alert.alert(
+        'Već imate recenziju',
+        'Možete napisati samo jednu recenziju.',
+        [{ text: 'U redu', style: 'default' }]
+      );
+      return;
+    }
+    
+    setIsModalVisible(true);
+  };
+
   useEffect(() => {
-    checkIfUserHasReview();
-  }, []);
+    if (isLoggedIn) {
+      checkUserStatus();
+    } else {
+      setUserHasReview(false);
+    }
+  }, [role, isLoggedIn]);
 
   const renderStars = (rating, interactive = false) => {
     return (
@@ -131,7 +165,7 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
             style={styles.starButton}
           >
             <Star
-              size={interactive ? 24 : 20}
+              size={interactive ? 28 : 20}
               color={star <= rating ? '#FFD700' : '#E5E5E7'}
               fill={star <= rating ? '#FFD700' : 'transparent'}
             />
@@ -148,69 +182,83 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
       transparent={true}
       onRequestClose={() => setIsModalVisible(false)}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Dodaj recenziju</Text>
-            <TouchableOpacity
-              onPress={() => setIsModalVisible(false)}
-              style={styles.closeButton}
-            >
-              <X size={24} color="#666" />
-            </TouchableOpacity>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalOverlay}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Dodaj recenziju</Text>
+                <TouchableOpacity
+                  onPress={() => setIsModalVisible(false)}
+                  style={styles.closeButton}
+                >
+                  <X size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView 
+                style={styles.modalBody}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>Ocena:</Text>
+                  {renderStars(newReview.rating, true)}
+                </View>
+                
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>Komentar:</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    multiline
+                    numberOfLines={4}
+                    value={newReview.content}
+                    onChangeText={(text) =>
+                      setNewReview({ ...newReview, content: text })
+                    }
+                    placeholder="Unesite vaš komentar..."
+                    placeholderTextColor="#999"
+                    returnKeyType="done"
+                  />
+                </View>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.submitButton,
+                    (newReview.rating === 0 || newReview.content.trim() === '') && styles.submitButtonDisabled,
+                  ]}
+                  onPress={handleSubmitReview}
+                  disabled={newReview.rating === 0 || newReview.content.trim() === ''}
+                >
+                  <Text style={styles.submitButtonText}>Pošalji recenziju</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
           </View>
-          
-          <ScrollView style={styles.modalBody}>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Ocena:</Text>
-              {renderStars(newReview.rating, true)}
-            </View>
-            
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Komentar:</Text>
-              <TextInput
-                style={styles.textInput}
-                multiline
-                numberOfLines={4}
-                value={newReview.content}
-                onChangeText={(text) =>
-                  setNewReview({ ...newReview, content: text })
-                }
-                placeholder="Unesite vaš komentar..."
-                placeholderTextColor="#999"
-              />
-            </View>
-            
-            <TouchableOpacity
-              style={[
-                styles.submitButton,
-                newReview.rating === 0 && styles.submitButtonDisabled,
-              ]}
-              onPress={handleSubmitReview}
-              disabled={newReview.rating === 0}
-            >
-              <Text style={styles.submitButtonText}>Pošalji</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </Modal>
   );
 
   if (!reviews || reviews.length === 0) {
     return (
       <View style={styles.container}>
-        <Text style={styles.sectionTitle}>Recenzije</Text>
+        <Text style={styles.sectionTitle}>Recenzije pacijenata</Text>
         <View style={styles.noReviewsContainer}>
-          <Text style={styles.noReviewsText}>Nema recenzija</Text>
-          {role === 'User' && !userHasReview && (
-            <TouchableOpacity
-              style={styles.addReviewButton}
-              onPress={() => setIsModalVisible(true)}
-            >
-              <Text style={styles.addReviewButtonText}>Napiši prvu recenziju</Text>
-            </TouchableOpacity>
-          )}
+          <Text style={styles.noReviewsText}>Trenutno nema recenzija</Text>
+          <Text style={styles.noReviewsSubtext}>
+            Budite prvi koji će podeliti svoje iskustvo!
+          </Text>
+          <TouchableOpacity
+            style={styles.addReviewButton}
+            onPress={handleAddReviewPress}
+          >
+            <Plus size={20} color="#ffffff" />
+            <Text style={styles.addReviewButtonText}>Napiši prvu recenziju</Text>
+          </TouchableOpacity>
         </View>
         {renderModal()}
       </View>
@@ -219,15 +267,15 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Recenzije</Text>
+      <Text style={styles.sectionTitle}>Recenzije pacijenata</Text>
       
       <View style={styles.carouselContainer}>
         <GestureDetector gesture={panGesture}>
           <View style={styles.reviewsCarousel}>
             {reviews.map((review, index) => {
-              let translateX = (index - currentIndex) * (screenWidth - 64);
-              let scale = index === currentIndex ? 1 : 0.8;
-              let opacity = index === currentIndex ? 1 : 0.3;
+              let translateX = (index - currentIndex) * (screenWidth - 48);
+              let scale = index === currentIndex ? 1 : 0.85;
+              let opacity = index === currentIndex ? 1 : 0.4;
               
               return (
                 <View
@@ -241,7 +289,10 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
                   ]}
                 >
                   <View style={styles.reviewHeader}>
-                    {renderStars(review.rating)}
+                    <View style={styles.reviewRatingContainer}>
+                      {renderStars(review.rating)}
+                      <Text style={styles.ratingText}>({review.rating}/5)</Text>
+                    </View>
                     {role === 'Admin' && (
                       <TouchableOpacity
                         onPress={() => handleDeleteReview(review.id)}
@@ -252,11 +303,16 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
                     )}
                   </View>
                   
-                  <Text style={styles.reviewContent}>{review.content}</Text>
-                  <Text style={styles.reviewAuthor}>Autor: {review.authorName}</Text>
-                  <Text style={styles.reviewDate}>
-                    Datum: {new Date(review.createdOn).toLocaleDateString()}
-                  </Text>
+                  <Text style={styles.reviewContent}>"{review.content}"</Text>
+                  
+                  <View style={styles.reviewFooter}>
+                    <Text style={styles.reviewAuthor}>
+                      {review.authorName || 'Anonimni korisnik'}
+                    </Text>
+                    <Text style={styles.reviewDate}>
+                      {new Date(review.createdOn).toLocaleDateString('sr-RS')}
+                    </Text>
+                  </View>
                 </View>
               );
             })}
@@ -272,6 +328,7 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
                 styles.dot,
                 {
                   backgroundColor: index === currentIndex ? '#007AFF' : '#E5E5E7',
+                  transform: [{ scale: index === currentIndex ? 1.2 : 1 }],
                 },
               ]}
               onPress={() => setCurrentIndex(index)}
@@ -280,14 +337,24 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
         </View>
       </View>
 
-      {role === 'User' && !userHasReview && (
+      {/* Add Review Button - samo za prijavljene korisnike koji nemaju recenziju */}
+      {isLoggedIn && !userHasReview && role !== 'Admin' && (
         <TouchableOpacity
           style={styles.addReviewButton}
-          onPress={() => setIsModalVisible(true)}
+          onPress={handleAddReviewPress}
         >
           <Plus size={20} color="#ffffff" />
           <Text style={styles.addReviewButtonText}>Napiši recenziju</Text>
         </TouchableOpacity>
+      )}
+
+      {/* Info text for non-logged users */}
+      {!isLoggedIn && (
+        <View style={styles.loginPromptContainer}>
+          <Text style={styles.loginPromptText}>
+            Prijavite se da biste mogli da napišete recenziju
+          </Text>
+        </View>
       )}
 
       {renderModal()}
@@ -311,14 +378,23 @@ const styles = StyleSheet.create({
   noReviewsContainer: {
     alignItems: 'center',
     paddingVertical: 48,
+    paddingHorizontal: 24,
   },
   noReviewsText: {
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: '600',
     color: '#666666',
-    marginBottom: 24,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  noReviewsSubtext: {
+    fontSize: 14,
+    color: '#999999',
+    marginBottom: 32,
+    textAlign: 'center',
   },
   carouselContainer: {
-    height: 280,
+    height: 320,
     marginBottom: 32,
   },
   reviewsCarousel: {
@@ -328,21 +404,33 @@ const styles = StyleSheet.create({
   },
   reviewCard: {
     position: 'absolute',
-    width: screenWidth - 64,
+    width: screenWidth - 48,
     backgroundColor: '#f8f9fa',
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   reviewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  reviewRatingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  ratingText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666666',
   },
   starsContainer: {
     flexDirection: 'row',
@@ -355,13 +443,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     color: '#1a1a1a',
-    marginBottom: 16,
+    marginBottom: 20,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  reviewFooter: {
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingTop: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   reviewAuthor: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2d3748',
-    marginBottom: 4,
+    color: '#007AFF',
   },
   reviewDate: {
     fontSize: 12,
@@ -380,16 +477,16 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   addReviewButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#007AFF',
-    paddingHorizontal: 24,
+    paddingHorizontal: 32,
     paddingVertical: 16,
     borderRadius: 25,
     gap: 8,
@@ -405,18 +502,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  loginPromptContainer: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  loginPromptText: {
+    fontSize: 14,
+    color: '#666666',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    paddingHorizontal: 16,
   },
   modalContent: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    width: '100%',
-    maxHeight: '80%',
+    borderRadius: 24,
+    minWidth: '98%',
+    maxWidth: 800,
+    maxHeight: '50%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
@@ -427,27 +534,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E7',
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1a1a1a',
   },
   closeButton: {
     padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
   },
   modalBody: {
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
   },
   formGroup: {
     marginBottom: 24,
   },
   label: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#1a1a1a',
     marginBottom: 12,
   },
@@ -460,6 +572,7 @@ const styles = StyleSheet.create({
     minHeight: 120,
     textAlignVertical: 'top',
     color: '#1a1a1a',
+    backgroundColor: '#ffffff',
   },
   submitButton: {
     backgroundColor: '#007AFF',
@@ -467,9 +580,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 8,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   submitButtonDisabled: {
     backgroundColor: '#cccccc',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   submitButtonText: {
     color: '#ffffff',
