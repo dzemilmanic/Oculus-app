@@ -1,35 +1,59 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 
-export default function Layout() {
+export default function TabLayout() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    checkAuthStatus();
-    
-    // Listen for storage changes to update auth status
-    const interval = setInterval(checkAuthStatus, 1000);
-    
-    return () => clearInterval(interval);
-  }, []);
-
-  const checkAuthStatus = async () => {
+  // Check login status
+  const checkAuthStatus = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
-      setIsLoggedIn(!!token);
+      const loggedIn = !!token;
+      console.log('Auth check - Token exists:', loggedIn);
+      setIsLoggedIn(loggedIn);
     } catch (error) {
+      console.error('Error checking auth status:', error);
       setIsLoggedIn(false);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  if (loading) {
-    return null; // or a loading spinner
-  }
+  // Check on mount
+  useEffect(() => {
+    checkAuthStatus();
+  }, [checkAuthStatus]);
+
+  // Check when app becomes active
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", nextAppState => {
+      if (nextAppState === "active") {
+        checkAuthStatus();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [checkAuthStatus]);
+
+  // Check when tab comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      checkAuthStatus();
+    }, [checkAuthStatus])
+  );
+
+  // Frequent check for auth changes (every 500ms)
+  useEffect(() => {
+    const interval = setInterval(checkAuthStatus, 500);
+    return () => clearInterval(interval);
+  }, [checkAuthStatus]);
+
+  if (loading) return null;
 
   return (
     <Tabs
@@ -82,6 +106,8 @@ export default function Layout() {
           ),
         }}
       />
+
+      {/* Conditionally render login OR profile tab */}
       {isLoggedIn ? (
         <Tabs.Screen
           name="profile"
@@ -103,6 +129,14 @@ export default function Layout() {
           }}
         />
       )}
+
+      {/* Hide the other tab when not needed */}
+      <Tabs.Screen
+        name={isLoggedIn ? "login" : "profile"}
+        options={{
+          href: null, // This hides the tab
+        }}
+      />
     </Tabs>
   );
 }

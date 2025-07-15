@@ -16,8 +16,6 @@ import {
 import { Lock, Eye, EyeOff, Pencil, LogOut } from 'lucide-react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import AllAppointmentsModal from '../../components/AllAppointmentsModal';
-import MedicalRecordModal from '../../components/MedicalRecordModal';
 
 const Profile = () => {
   const [user, setUser] = useState({
@@ -53,7 +51,6 @@ const Profile = () => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
       if (!token) {
-        router.replace('/login');
         return;
       }
 
@@ -294,8 +291,36 @@ const Profile = () => {
         {
           text: 'Da',
           onPress: async () => {
-            await AsyncStorage.removeItem('jwtToken');
-            router.replace('/(tabs)');
+            try {
+              // Remove token from storage
+              await AsyncStorage.removeItem('jwtToken');
+              
+              // Wait a bit to ensure token is removed
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
+              // Clear all user data from state
+              setUser({
+                ime: '',
+                prezime: '',
+                email: '',
+                biography: '',
+                profileImagePath: '',
+              });
+              setRole('');
+              setDoctorId('');
+              setAppointments([]);
+              
+              // Close any open modals
+              setIsModalOpen(false);
+              setAppointmentsModalOpen(false);
+              setIsMedicalRecordModalOpen(false);
+              
+              console.log('User logged out successfully');
+              Alert.alert('Uspeh', 'Uspešno ste se odjavili!');
+            } catch (error) {
+              console.error('Logout error:', error);
+              Alert.alert('Greška', 'Greška prilikom odjave');
+            }
           },
         },
       ]
@@ -560,19 +585,6 @@ const Profile = () => {
           </View>
 
           {renderEditModal()}
-
-          <AllAppointmentsModal
-            isOpen={appointmentsModalOpen}
-            onClose={handleCloseAppointmentsModal}
-            appointments={appointments}
-            userRole={role}
-          />
-
-          <MedicalRecordModal
-            isOpen={isMedicalRecordModalOpen}
-            onClose={() => setIsMedicalRecordModalOpen(false)}
-            appointments={appointments}
-          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
