@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  Modal,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
+  Modal,
+  ScrollView,
   TextInput,
+  FlatList,
 } from 'react-native';
-import { ArrowUpDown } from 'lucide-react-native';
+import { Picker } from '@react-native-picker/picker';
+import { ArrowUpDown, Search, X, FileText, User, Calendar } from 'lucide-react-native';
 
 const MedicalRecordModal = ({ isOpen, onClose, appointments }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,103 +39,116 @@ const MedicalRecordModal = ({ isOpen, onClose, appointments }) => {
     setFilteredAppointments(filtered);
   }, [appointments, searchTerm, sortBy]);
 
+  const renderAppointmentItem = ({ item }) => {
+    const date = new Date(item.appointmentDate);
+    const formattedDate = date.toLocaleDateString('sr-RS', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+    const formattedTime = date.toLocaleTimeString('sr-RS', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    return (
+      <View style={styles.appointmentCard}>
+        <View style={styles.appointmentHeader}>
+          <View style={styles.dateTimeContainer}>
+            <Calendar size={16} color="#007AFF" />
+            <Text style={styles.appointmentDate}>{formattedDate}</Text>
+            <Text style={styles.appointmentTime}>{formattedTime}</Text>
+          </View>
+        </View>
+        
+        <Text style={styles.serviceName}>{item.serviceName}</Text>
+        
+        {item.doctorFullName && (
+          <View style={styles.doctorContainer}>
+            <User size={16} color="#10B981" />
+            <Text style={styles.doctorName}>Lekar: {item.doctorFullName}</Text>
+          </View>
+        )}
+
+        {item.notes && (
+          <View style={styles.notesContainer}>
+            <View style={styles.notesHeader}>
+              <FileText size={16} color="#0369A1" />
+              <Text style={styles.notesLabel}>Beleška:</Text>
+            </View>
+            <Text style={styles.notesText}>{item.notes}</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   if (!isOpen) return null;
 
   return (
     <Modal
       visible={isOpen}
       transparent
-      animationType="fade"
+      animationType="slide"
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Vaš Karton</Text>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Vaš Karton</Text>
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <X size={24} color="#6B7280" />
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.filterSection}>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Pretraži po lekaru ili usluzi..."
-              value={searchTerm}
-              onChangeText={setSearchTerm}
-            />
+            <View style={styles.searchContainer}>
+              <Search size={20} color="#9CA3AF" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Pretraži po lekaru ili usluzi..."
+                placeholderTextColor="#9CA3AF"
+                value={searchTerm}
+                onChangeText={setSearchTerm}
+              />
+            </View>
             
             <View style={styles.sortContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.sortButton,
-                  sortBy === 'newest' && styles.activeSortButton
-                ]}
-                onPress={() => setSortBy('newest')}
-              >
-                <Text style={[
-                  styles.sortButtonText,
-                  sortBy === 'newest' && styles.activeSortButtonText
-                ]}>
-                  Najskoriji
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.sortButton,
-                  sortBy === 'oldest' && styles.activeSortButton
-                ]}
-                onPress={() => setSortBy('oldest')}
-              >
-                <Text style={[
-                  styles.sortButtonText,
-                  sortBy === 'oldest' && styles.activeSortButtonText
-                ]}>
-                  Najstariji
-                </Text>
-              </TouchableOpacity>
+              <Text style={styles.sortLabel}>Sortiraj:</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={sortBy}
+                  onValueChange={(value) => setSortBy(value)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Sortiraj po..." value="none" />
+                  <Picker.Item label="Najskoriji prvo" value="newest" />
+                  <Picker.Item label="Najstariji prvo" value="oldest" />
+                </Picker>
+              </View>
             </View>
           </View>
 
-          <ScrollView style={styles.appointmentsList}>
-            {filteredAppointments.length > 0 ? (
-              filteredAppointments.map((appointment) => {
-                const date = new Date(appointment.appointmentDate);
-                const formattedDate = date.toLocaleDateString('sr-RS', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                });
-                const formattedTime = date.toLocaleTimeString('sr-RS', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                });
-
-                return (
-                  <View key={appointment.id} style={styles.appointmentItem}>
-                    <Text style={styles.appointmentText}>
-                      <Text style={styles.boldText}>Datum:</Text> {formattedDate}
-                    </Text>
-                    <Text style={styles.appointmentText}>
-                      <Text style={styles.boldText}>Vreme:</Text> {formattedTime}
-                    </Text>
-                    <Text style={styles.appointmentText}>
-                      <Text style={styles.boldText}>Usluga:</Text> {appointment.serviceName}
-                    </Text>
-                    {appointment.notes && (
-                      <Text style={styles.appointmentText}>
-                        <Text style={styles.boldText}>Beleška:</Text> {appointment.notes}
-                      </Text>
-                    )}
-                    <Text style={styles.appointmentText}>
-                      <Text style={styles.boldText}>Lekar:</Text> {appointment.doctorFullName}
-                    </Text>
-                  </View>
-                );
-              })
-            ) : (
+          {filteredAppointments.length > 0 ? (
+            <FlatList
+              data={filteredAppointments}
+              renderItem={renderAppointmentItem}
+              keyExtractor={(item) => item.id.toString()}
+              style={styles.appointmentsList}
+              showsVerticalScrollIndicator={false}
+            />
+          ) : (
+            <View style={styles.noAppointmentsContainer}>
+              <FileText size={60} color="#9CA3AF" />
               <Text style={styles.noAppointmentsText}>Nemate završenih termina.</Text>
-            )}
-          </ScrollView>
+            </View>
+          )}
 
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>Zatvori</Text>
-          </TouchableOpacity>
+          <View style={styles.modalFooter}>
+            <TouchableOpacity style={styles.closeModalButton} onPress={onClose}>
+              <Text style={styles.closeModalButtonText}>Zatvori</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -146,113 +161,193 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 20,
     width: '100%',
     maxWidth: 500,
-    maxHeight: '90%',
+    minHeight: '70%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 24,
     elevation: 8,
   },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
   modalTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    textAlign: 'center',
-    marginBottom: 20,
-    borderBottomWidth: 2,
-    borderBottomColor: '#E2E8F0',
-    paddingBottom: 12,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  closeButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
   },
   filterSection: {
-    backgroundColor: '#F8F9FA',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
   },
-  searchInput: {
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    height: 50,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
     fontSize: 16,
-    backgroundColor: '#FFFFFF',
-    marginBottom: 12,
+    color: '#1E293B',
   },
   sortContainer: {
     flexDirection: 'row',
-    gap: 8,
-  },
-  sortButton: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
     alignItems: 'center',
+    gap: 12,
   },
-  activeSortButton: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  sortButtonText: {
+  sortLabel: {
     fontSize: 14,
+    fontWeight: '600',
     color: '#374151',
-    fontWeight: '500',
+    width: 60,
   },
-  activeSortButtonText: {
-    color: '#FFFFFF',
+  pickerContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  picker: {
+    height: 40,
+    color: '#1E293B',
   },
   appointmentsList: {
     flex: 1,
-    marginBottom: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
   },
-  appointmentItem: {
-    backgroundColor: '#F5F5F7',
+  appointmentCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     padding: 16,
-    borderRadius: 8,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
+    borderLeftColor: '#10B981',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  appointmentText: {
-    fontSize: 14,
-    color: '#1C1C1E',
-    marginBottom: 4,
+  appointmentHeader: {
+    marginBottom: 12,
   },
-  boldText: {
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  noAppointmentsText: {
-    textAlign: 'center',
-    color: '#666',
-    fontSize: 16,
-    fontStyle: 'italic',
-    padding: 32,
-    backgroundColor: '#F5F5F7',
-    borderRadius: 8,
-  },
-  closeButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 14,
-    borderRadius: 8,
+  dateTimeContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
-  closeButtonText: {
-    color: '#FFFFFF',
+  appointmentDate: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  appointmentTime: {
+    fontSize: 14,
+    color: '#64748B',
+    marginLeft: 8,
+  },
+  serviceName: {
     fontSize: 16,
     fontWeight: '500',
+    color: '#007AFF',
+    marginBottom: 8,
+  },
+  doctorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  doctorName: {
+    fontSize: 14,
+    color: '#10B981',
+    fontWeight: '500',
+  },
+  notesContainer: {
+    backgroundColor: '#F0F9FF',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  notesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  notesLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0369A1',
+  },
+  notesText: {
+    fontSize: 14,
+    color: '#1E293B',
+    lineHeight: 20,
+  },
+  noAppointmentsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  noAppointmentsText: {
+    fontSize: 16,
+    color: '#64748B',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginTop: 16,
+  },
+  modalFooter: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  closeModalButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  closeModalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

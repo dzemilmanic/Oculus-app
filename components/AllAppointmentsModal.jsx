@@ -2,15 +2,19 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  Modal,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
-  TextInput,
+  Modal,
+  ScrollView,
   ActivityIndicator,
+  TextInput,
   Alert,
+  FlatList,
 } from 'react-native';
-import { ArrowUpDown, Clock } from 'lucide-react-native';
+import { Picker } from '@react-native-picker/picker';
+import { ArrowUpDown, Clock, X, FileText } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isTokenValid } from '@/utils/tokenUtils';
 
 const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
   const [isAddNotesModalOpen, setIsAddNotesModalOpen] = useState(false);
@@ -36,7 +40,7 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
 
       let filtered = [...initialAppointments];
       
-      // Apply time filter
+      // Apply time filter (past or all)
       if (filters.timeFilter === 'past') {
         filtered = filtered.filter(app => isAppointmentPassed(app.appointmentDate));
       } else if (filters.timeFilter === 'upcoming') {
@@ -50,11 +54,16 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
           const dateA = new Date(a.appointmentDate);
           const dateB = new Date(b.appointmentDate);
           
+          // If both are in the future, sort by nearest
           if (dateA > now && dateB > now) {
             return dateA - dateB;
-          } else if (dateA < now && dateB < now) {
+          }
+          // If both are in the past, sort by most recent
+          else if (dateA < now && dateB < now) {
             return dateB - dateA;
-          } else {
+          }
+          // Future dates come before past dates
+          else {
             return dateA > now ? -1 : 1;
           }
         });
@@ -63,11 +72,16 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
           const dateA = new Date(a.appointmentDate);
           const dateB = new Date(b.appointmentDate);
           
+          // If both are in the future, sort by furthest
           if (dateA > now && dateB > now) {
             return dateB - dateA;
-          } else if (dateA < now && dateB < now) {
+          }
+          // If both are in the past, sort by oldest
+          else if (dateA < now && dateB < now) {
             return dateA - dateB;
-          } else {
+          }
+          // Future dates come before past dates
+          else {
             return dateA > now ? -1 : 1;
           }
         });
@@ -93,11 +107,26 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
       case 1:
         return 'Odobren';
       case 2:
-        return 'Zavrsen';
+        return 'Završen';
       case 3:
         return 'Otkazan';
       default:
         return 'Nepoznato';
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 0:
+        return '#F59E0B';
+      case 1:
+        return '#10B981';
+      case 2:
+        return '#6B7280';
+      case 3:
+        return '#EF4444';
+      default:
+        return '#6B7280';
     }
   };
 
@@ -117,6 +146,13 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
       Alert.alert('Greška', 'Napomena ne može biti prazna');
       return;
     }
+
+    const token = await AsyncStorage.getItem('jwtToken');
+    if (!token || !isTokenValid(token)) {
+      Alert.alert('Greška', 'Sesija je istekla. Molimo prijavite se ponovo.');
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await fetch(
@@ -125,6 +161,7 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(note),
         }
@@ -134,7 +171,12 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
         Alert.alert('Uspeh', 'Beleška uspešno dodata!');
         handleCloseAddNotesModal();
       } else {
-        Alert.alert('Greška', 'Greška prilikom dodavanja beleške!');
+        if (response.status === 401) {
+          Alert.alert('Greška', 'Sesija je istekla. Molimo prijavite se ponovo.');
+          await AsyncStorage.removeItem('jwtToken');
+        } else {
+          Alert.alert('Greška', 'Greška prilikom dodavanja beleške!');
+        }
       }
     } catch (error) {
       Alert.alert('Greška', 'Error: ' + error.message);
@@ -143,369 +185,417 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
     }
   };
 
+  const handleFilterChange = (name, value) => {
+    setFilters((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
   const isAppointmentPassed = (appointmentDate) => {
     const now = new Date();
     const appDate = new Date(appointmentDate);
     return appDate < now;
   };
 
+  const renderAppointmentItem = ({ item }) => {
+    const date = new Date(item.appointmentDate);
+    const formattedDate = date.toLocaleDateString('sr-RS', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+    const formattedTime = date.toLocaleTimeString('sr-RS', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    const appointmentPassed = isAppointmentPassed(item.appointmentDate);
+
+    return (
+      <View style={[
+        styles.appointmentCard,
+        appointmentPassed ? styles.pastAppointment : styles.upcomingAppointment
+      ]}>
+        <View style={styles.appointmentHeader}>
+          <Text style={styles.appointmentDate}>{formattedDate}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+            <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+          </View>
+        </View>
+        
+        <Text style={styles.appointmentTime}>
+          <Clock size={16} color="#64748B" /> {formattedTime}
+        </Text>
+        
+        <Text style={styles.serviceName}>{item.serviceName}</Text>
+        
+        {item.doctorFullName && (
+          <Text style={styles.doctorName}>Lekar: {item.doctorFullName}</Text>
+        )}
+
+        {item.notes && (
+          <View style={styles.notesContainer}>
+            <Text style={styles.notesLabel}>Beleška:</Text>
+            <Text style={styles.notesText}>{item.notes}</Text>
+          </View>
+        )}
+
+        {userRole &&
+          userRole.includes('Doctor') &&
+          item.status !== 2 &&
+          appointmentPassed && (
+            <TouchableOpacity
+              style={styles.addNotesButton}
+              onPress={() => handleOpenAddNotesModal(item.id)}
+            >
+              <FileText size={16} color="#FFFFFF" />
+              <Text style={styles.addNotesButtonText}>Dodaj belešku</Text>
+            </TouchableOpacity>
+          )}
+      </View>
+    );
+  };
+
   if (!isOpen) return null;
 
   return (
-    <>
-      <Modal
-        visible={isOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={onClose}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+    <Modal
+      visible={isOpen}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Vaši termini</Text>
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <X size={24} color="#6B7280" />
+            </TouchableOpacity>
+          </View>
 
-            <View style={styles.filterSection}>
-              <View style={styles.filterRow}>
-                <Text style={styles.filterLabel}>Sortiraj:</Text>
-                <View style={styles.pickerContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.filterButton,
-                      filters.sortBy === 'nearest' && styles.activeFilter
-                    ]}
-                    onPress={() => setFilters(prev => ({ ...prev, sortBy: 'nearest' }))}
-                  >
-                    <Text style={[
-                      styles.filterButtonText,
-                      filters.sortBy === 'nearest' && styles.activeFilterText
-                    ]}>
-                      Najskoriji
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.filterButton,
-                      filters.sortBy === 'furthest' && styles.activeFilter
-                    ]}
-                    onPress={() => setFilters(prev => ({ ...prev, sortBy: 'furthest' }))}
-                  >
-                    <Text style={[
-                      styles.filterButtonText,
-                      filters.sortBy === 'furthest' && styles.activeFilterText
-                    ]}>
-                      Najdalji
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+          <View style={styles.filterSection}>
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Sortiraj:</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={filters.sortBy}
+                  onValueChange={(value) => handleFilterChange('sortBy', value)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Najskoriji prvo" value="nearest" />
+                  <Picker.Item label="Najdalji prvo" value="furthest" />
+                </Picker>
               </View>
-
-              {userRole && userRole.includes('Doctor') && (
-                <View style={styles.filterRow}>
-                  <Text style={styles.filterLabel}>Vreme:</Text>
-                  <View style={styles.pickerContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.filterButton,
-                        filters.timeFilter === 'all' && styles.activeFilter
-                      ]}
-                      onPress={() => setFilters(prev => ({ ...prev, timeFilter: 'all' }))}
-                    >
-                      <Text style={[
-                        styles.filterButtonText,
-                        filters.timeFilter === 'all' && styles.activeFilterText
-                      ]}>
-                        Svi
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.filterButton,
-                        filters.timeFilter === 'past' && styles.activeFilter
-                      ]}
-                      onPress={() => setFilters(prev => ({ ...prev, timeFilter: 'past' }))}
-                    >
-                      <Text style={[
-                        styles.filterButtonText,
-                        filters.timeFilter === 'past' && styles.activeFilterText
-                      ]}>
-                        Prošli
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.filterButton,
-                        filters.timeFilter === 'upcoming' && styles.activeFilter
-                      ]}
-                      onPress={() => setFilters(prev => ({ ...prev, timeFilter: 'upcoming' }))}
-                    >
-                      <Text style={[
-                        styles.filterButtonText,
-                        filters.timeFilter === 'upcoming' && styles.activeFilterText
-                      ]}>
-                        Budući
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
             </View>
 
-            <ScrollView style={styles.appointmentsList}>
-              {filteredAppointments.length > 0 ? (
-                filteredAppointments.map((appointment) => {
-                  const date = new Date(appointment.appointmentDate);
-                  const formattedDate = date.toLocaleDateString('sr-RS', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                  });
-                  const formattedTime = date.toLocaleTimeString('sr-RS', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  });
+            {userRole && userRole.includes('Doctor') && (
+              <View style={styles.filterRow}>
+                <Text style={styles.filterLabel}>Vreme:</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={filters.timeFilter}
+                    onValueChange={(value) => handleFilterChange('timeFilter', value)}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="Svi termini" value="all" />
+                    <Picker.Item label="Prošli termini" value="past" />
+                    <Picker.Item label="Budući termini" value="upcoming" />
+                  </Picker>
+                </View>
+              </View>
+            )}
 
-                  const appointmentPassed = isAppointmentPassed(appointment.appointmentDate);
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Status:</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={filters.status}
+                  onValueChange={(value) => handleFilterChange('status', value)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Svi statusi" value="all" />
+                  {userRole === 'User' && (
+                    <Picker.Item label="Čeka se odobrenje" value="0" />
+                  )}
+                  <Picker.Item label="Odobren" value="1" />
+                  {userRole === 'User' && <Picker.Item label="Otkazan" value="3" />}
+                  {userRole !== 'User' && <Picker.Item label="Završen" value="2" />}
+                </Picker>
+              </View>
+            </View>
+          </View>
 
-                  return (
-                    <View
-                      key={appointment.id}
-                      style={[
-                        styles.appointmentItem,
-                        appointmentPassed ? styles.pastAppointment : styles.upcomingAppointment
-                      ]}
-                    >
-                      <View style={styles.appointmentInfo}>
-                        <Text style={styles.appointmentText}>
-                          <Text style={styles.boldText}>Datum:</Text> {formattedDate}
-                        </Text>
-                        <Text style={styles.appointmentText}>
-                          <Text style={styles.boldText}>Vreme:</Text> {formattedTime}
-                          <Text style={[
-                            styles.timeIndicator,
-                            appointmentPassed ? styles.timePast : styles.timeFuture
-                          ]}>
-                            {appointmentPassed ? ' (Prošao)' : ' (Predstoji)'}
-                          </Text>
-                        </Text>
-                        <Text style={styles.appointmentText}>
-                          <Text style={styles.boldText}>Usluga:</Text> {appointment.serviceName}
-                        </Text>
-                        <Text style={styles.appointmentText}>
-                          <Text style={styles.boldText}>Status:</Text> {getStatusText(appointment.status)}
-                        </Text>
-                      </View>
-                      
-                      {userRole &&
-                        userRole.includes('Doctor') &&
-                        appointment.status !== 2 &&
-                        appointmentPassed && (
-                          <TouchableOpacity
-                            style={styles.addNotesButton}
-                            onPress={() => handleOpenAddNotesModal(appointment.id)}
-                          >
-                            <Text style={styles.addNotesButtonText}>Dodaj belešku</Text>
-                          </TouchableOpacity>
-                        )}
-                    </View>
-                  );
-                })
-              ) : (
-                <Text style={styles.noAppointmentsText}>Nemate zakazane termine.</Text>
-              )}
-            </ScrollView>
+          {filteredAppointments.length > 0 ? (
+            <FlatList
+              data={filteredAppointments}
+              renderItem={renderAppointmentItem}
+              keyExtractor={(item) => item.id.toString()}
+              style={styles.appointmentsList}
+              showsVerticalScrollIndicator={false}
+            />
+          ) : (
+            <View style={styles.noAppointmentsContainer}>
+              <Text style={styles.noAppointmentsText}>Nemate zakazane termine.</Text>
+            </View>
+          )}
 
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Text style={styles.closeButtonText}>Zatvori</Text>
+          <View style={styles.modalFooter}>
+            <TouchableOpacity style={styles.closeModalButton} onPress={onClose}>
+              <Text style={styles.closeModalButtonText}>Zatvori</Text>
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </View>
 
-      {/* Notes Modal */}
+      {/* Add Notes Modal */}
       <Modal
         visible={isAddNotesModalOpen}
         transparent
         animationType="fade"
         onRequestClose={handleCloseAddNotesModal}
       >
-        <View style={styles.modalOverlay}>
+        <View style={styles.notesModalOverlay}>
           <View style={styles.notesModalContent}>
-            <Text style={styles.modalTitle}>Dodaj belešku</Text>
+            <Text style={styles.notesModalTitle}>Dodaj belešku</Text>
             <TextInput
-              style={styles.notesTextArea}
+              style={styles.notesInput}
               placeholder="Unesite napomene..."
+              placeholderTextColor="#9CA3AF"
               value={note}
               onChangeText={setNote}
               multiline
               numberOfLines={6}
+              textAlignVertical="top"
             />
             <View style={styles.notesModalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+                style={styles.notesModalButton}
                 onPress={handleCloseAddNotesModal}
               >
-                <Text style={styles.cancelButtonText}>Zatvori</Text>
+                <Text style={styles.notesModalButtonText}>Zatvori</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
+                style={[styles.notesModalButton, styles.saveNotesButton]}
                 onPress={handleSaveNotes}
                 disabled={loading}
               >
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.saveButtonText}>Spremi</Text>
+                  <Text style={styles.saveNotesButtonText}>Spremi</Text>
                 )}
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-    </>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 20,
     width: '100%',
     maxWidth: 500,
-    maxHeight: '90%',
+    minHeight: '70%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 24,
     elevation: 8,
   },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
   modalTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    textAlign: 'center',
-    marginBottom: 20,
-    borderBottomWidth: 2,
-    borderBottomColor: '#E2E8F0',
-    paddingBottom: 12,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  closeButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
   },
   filterSection: {
-    backgroundColor: '#F8F9FA',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
   },
   filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
   },
   filterLabel: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#374151',
-    marginBottom: 8,
+    width: 80,
   },
   pickerContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  filterButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
+    flex: 1,
     backgroundColor: '#FFFFFF',
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#D1D5DB',
   },
-  activeFilter: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  filterButtonText: {
-    fontSize: 12,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  activeFilterText: {
-    color: '#FFFFFF',
+  picker: {
+    height: 40,
+    color: '#1E293B',
   },
   appointmentsList: {
     flex: 1,
-    marginBottom: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
   },
-  appointmentItem: {
-    backgroundColor: '#F5F5F7',
+  appointmentCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     padding: 16,
-    borderRadius: 8,
     marginBottom: 12,
-    borderLeftWidth: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   pastAppointment: {
-    borderLeftColor: '#8C8C8C',
-    backgroundColor: '#F5F5F5',
+    borderLeftWidth: 4,
+    borderLeftColor: '#6B7280',
+    backgroundColor: '#F9FAFB',
   },
   upcomingAppointment: {
-    borderLeftColor: '#4CAF50',
+    borderLeftWidth: 4,
+    borderLeftColor: '#10B981',
   },
-  appointmentInfo: {
+  appointmentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
-  appointmentText: {
-    fontSize: 14,
-    color: '#1C1C1E',
-    marginBottom: 4,
-  },
-  boldText: {
+  appointmentDate: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#007AFF',
+    color: '#1E293B',
   },
-  timeIndicator: {
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
     fontSize: 12,
     fontWeight: '500',
+    color: '#FFFFFF',
   },
-  timePast: {
-    color: '#666',
+  appointmentTime: {
+    fontSize: 14,
+    color: '#64748B',
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  timeFuture: {
-    color: '#2E7D32',
+  serviceName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#007AFF',
+    marginBottom: 4,
+  },
+  doctorName: {
+    fontSize: 14,
+    color: '#64748B',
+    marginBottom: 8,
+  },
+  notesContainer: {
+    backgroundColor: '#F0F9FF',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  notesLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0369A1',
+    marginBottom: 4,
+  },
+  notesText: {
+    fontSize: 14,
+    color: '#1E293B',
+    lineHeight: 20,
   },
   addNotesButton: {
     backgroundColor: '#007AFF',
-    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 8,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    gap: 6,
   },
   addNotesButtonText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '500',
+  },
+  noAppointmentsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
   },
   noAppointmentsText: {
-    textAlign: 'center',
-    color: '#666',
     fontSize: 16,
+    color: '#64748B',
+    textAlign: 'center',
     fontStyle: 'italic',
-    padding: 32,
-    backgroundColor: '#F5F5F7',
-    borderRadius: 8,
   },
-  closeButton: {
+  modalFooter: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  closeModalButton: {
     backgroundColor: '#007AFF',
+    borderRadius: 12,
     paddingVertical: 14,
-    borderRadius: 8,
     alignItems: 'center',
   },
-  closeButtonText: {
+  closeModalButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
+  },
+  // Notes Modal Styles
+  notesModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   notesModalContent: {
     backgroundColor: '#FFFFFF',
@@ -519,14 +609,21 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 8,
   },
-  notesTextArea: {
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    padding: 12,
+  notesModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  notesInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     fontSize: 16,
-    color: '#1C1C1E',
-    backgroundColor: '#F5F5F7',
+    color: '#1E293B',
     minHeight: 120,
     textAlignVertical: 'top',
     marginBottom: 20,
@@ -535,28 +632,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  modalButton: {
+  notesModalButton: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
+    backgroundColor: '#6B7280',
+    borderRadius: 12,
+    paddingVertical: 12,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  saveButton: {
+  notesModalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  saveNotesButton: {
     backgroundColor: '#007AFF',
   },
-  saveButtonText: {
+  saveNotesButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '500',
-  },
-  cancelButton: {
-    backgroundColor: '#FF3B30',
-  },
-  cancelButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });
 

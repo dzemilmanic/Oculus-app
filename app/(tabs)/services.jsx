@@ -21,6 +21,7 @@ import { Pencil, Trash2, Search, X } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserRoleFromToken, isTokenValid, decodeJWTToken } from '@/utils/tokenUtils';
+import AppointmentModal from '@/components/AppointmentModal';
 
 const Services = () => {
   const [services, setServices] = useState([]);
@@ -235,8 +236,8 @@ const Services = () => {
     setShowDeleteModal(false);
   };
 
-  const handleReserveClick = (service) => {
-    const token = AsyncStorage.getItem('jwtToken');
+  const handleReserveClick = async (service) => {
+    const token = await AsyncStorage.getItem('jwtToken');
     if (!token) {
       Alert.alert('Greška', 'Morate biti prijavljeni da biste rezervisali termin.');
       return;
@@ -489,15 +490,11 @@ const Services = () => {
             </View>
             
             <View style={styles.sortContainer}>
-              
-              <View style={styles.sortPickerWrapper}>
-              
               <View style={styles.sortPickerWrapper}>
                 <Picker
                   selectedValue={sortType}
                   onValueChange={(itemValue) => setSortType(itemValue)}
                   itemStyle={styles.pickerItem}
-                  
                 >
                   <Picker.Item label="Sortiraj po..." value="none" />
                   <Picker.Item label="Cena (rastuće)" value="priceAsc" />
@@ -505,7 +502,6 @@ const Services = () => {
                   <Picker.Item label="Naziv (A-Z)" value="nameAsc" />
                   <Picker.Item label="Naziv (Z-A)" value="nameDesc" />
                 </Picker>
-              </View>
               </View>
             </View>
           </View>
@@ -544,6 +540,13 @@ const Services = () => {
           />
         )}
       </View>
+
+      {/* Appointment Modal */}
+      <AppointmentModal
+        isOpen={isAppointmentModalOpen}
+        onClose={() => setIsAppointmentModalOpen(false)}
+        service={selectedService}
+      />
 
       {/* Add Service Modal */}
       <Modal
@@ -861,26 +864,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
-  sortLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 4,
-  },
-  sortPickerWrapper: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  sortLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
   sortPickerWrapper: {
     backgroundColor: '#F8FAFC',
     borderRadius: 8,
@@ -888,12 +871,6 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     overflow: 'hidden',
     minHeight: 60,
-  },
-  sortPicker: {
-    height: 60,
-    color: '#1E293B',
-    fontSize: 16,
-    fontWeight: '500',
   },
   pickerItem: {
     fontSize: 16,
@@ -1048,7 +1025,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 16,
