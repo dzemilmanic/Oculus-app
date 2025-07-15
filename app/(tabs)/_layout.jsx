@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { isTokenValid } from '@/utils/tokenUtils';
 
 export default function TabLayout() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -13,9 +14,15 @@ export default function TabLayout() {
   const checkAuthStatus = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
-      const loggedIn = !!token;
+      const loggedIn = token && token.trim() !== '' && isTokenValid(token);
       console.log('Auth check - Token exists:', loggedIn);
       setIsLoggedIn(loggedIn);
+      
+      // If token is invalid, remove it
+      if (token && !loggedIn) {
+        console.log('Removing invalid token');
+        await AsyncStorage.removeItem('jwtToken');
+      }
     } catch (error) {
       console.error('Error checking auth status:', error);
       setIsLoggedIn(false);
@@ -47,9 +54,9 @@ export default function TabLayout() {
     }, [checkAuthStatus])
   );
 
-  // Frequent check for auth changes (every 500ms)
+  // Frequent check for auth changes (every 1000ms)
   useEffect(() => {
-    const interval = setInterval(checkAuthStatus, 500);
+    const interval = setInterval(checkAuthStatus, 1000);
     return () => clearInterval(interval);
   }, [checkAuthStatus]);
 

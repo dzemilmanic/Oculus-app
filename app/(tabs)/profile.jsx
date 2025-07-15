@@ -4,18 +4,19 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  SafeAreaView,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
+  SafeAreaView,
+  Alert,
   ScrollView,
+  Modal,
+  ActivityIndicator,
   Image,
 } from 'react-native';
-import { Lock, Eye, EyeOff, Pencil, LogOut } from 'lucide-react-native';
-import { router } from 'expo-router';
+import { Lock, Eye, EyeOff, Edit3 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getUserRoleFromToken, getUserIdFromToken, decodeJWTToken } from '@/utils/tokenUtils';
+import AllAppointmentsModal from '@/components/AllAppointmentsModal';
+import MedicalRecordModal from '@/components/MedicalRecordModal';
 
 const Profile = () => {
   const [user, setUser] = useState({
@@ -41,77 +42,57 @@ const Profile = () => {
   const [doctorId, setDoctorId] = useState('');
   const [appointmentsModalOpen, setAppointmentsModalOpen] = useState(false);
   const [isMedicalRecordModalOpen, setIsMedicalRecordModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const token = await AsyncStorage.getItem('jwtToken');
+        const response = await fetch(
+          'https://klinikabackend-production.up.railway.app/api/Auth/GetUserData',
+          {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          setUser({
+            ime: data.firstName || 'nepoznato',
+            prezime: data.lastName || 'nepoznato',
+            email: data.email || 'nepoznato',
+            biography: data.biography || '',
+            profileImagePath: data.profileImagePath || '',
+          });
+        } else {
+          console.error('Greška prilikom učitavanja podataka o korisniku');
+        }
+
+        if (token) {
+          const roles = getUserRoleFromToken(token);
+          setRole(roles);
+          if (roles.includes('Doctor')) {
+            const doctorId = getUserIdFromToken(token);
+            setDoctorId(doctorId);
+          }
+        }
+      } catch (error) {
+        console.error('Greška prilikom poziva API-ja:', error);
+      }
+    };
+
     fetchUserData();
   }, []);
-
-  const fetchUserData = async () => {
-    try {
-      const token = await AsyncStorage.getItem('jwtToken');
-      if (!token) {
-        return;
-      }
-
-      const response = await fetch(
-        'https://klinikabackend-production.up.railway.app/api/Auth/GetUserData',
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setUser({
-          ime: data.firstName || 'nepoznato',
-          prezime: data.lastName || 'nepoznato',
-          email: data.email || 'nepoznato',
-          biography: data.biography || '',
-          profileImagePath: data.profileImagePath || '',
-        });
-      } else {
-        Alert.alert('Greška', 'Greška prilikom učitavanja podataka o korisniku');
-      }
-
-      // Decode JWT token for role
-      const payload = token.split('.')[1];
-      const decodedPayload = JSON.parse(
-        Buffer.from(payload, 'base64').toString()
-      );
-      const roles =
-        decodedPayload[
-          'http://schemas.microsoft.com/ws/2008/06/identity/claims/role'
-        ];
-      setRole(roles);
-      
-      if (roles && roles.includes('Doctor')) {
-        const doctorId =
-          decodedPayload[
-            'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'
-          ];
-        setDoctorId(doctorId);
-      }
-    } catch (error) {
-      Alert.alert('Greška', 'Greška prilikom poziva API-ja');
-    }
-  };
 
   const fetchAppointments = async () => {
     const token = await AsyncStorage.getItem('jwtToken');
     if (token) {
       try {
-        const payload = token.split('.')[1];
-        const decodedPayload = JSON.parse(
-          Buffer.from(payload, 'base64').toString()
-        );
-        const patientId =
-          decodedPayload[
-            'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'
-          ];
+        const payload = decodeJWTToken(token);
+        const patientId = payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'];
 
         let response;
         if (role.includes('Doctor') && doctorId) {
@@ -140,10 +121,10 @@ const Profile = () => {
           const data = await response.json();
           setAppointments(data);
         } else {
-          Alert.alert('Greška', 'Greška prilikom dohvatanja termina.');
+          console.error('Greška prilikom dohvatanja termina.');
         }
       } catch (error) {
-        Alert.alert('Greška', 'Greška prilikom poziva API-ja');
+        console.error('Greška prilikom poziva API-ja:', error);
       }
     }
   };
@@ -161,7 +142,6 @@ const Profile = () => {
     setModalField(field);
     setIsModalOpen(true);
     setErrorMessage('');
-    
     if (field === 'ime') {
       setNewIme(user.ime);
     } else if (field === 'prezime') {
@@ -216,8 +196,7 @@ const Profile = () => {
       biography: modalField === 'biography' ? newBiography : user.biography,
     };
 
-    setIsLoading(true);
-
+    setLoading(true);
     try {
       const token = await AsyncStorage.getItem('jwtToken');
       const response = await fetch(
@@ -241,14 +220,11 @@ const Profile = () => {
       if (response.ok) {
         setUser(updatedUser);
         setIsModalOpen(false);
-        
         if (modalField === 'password') {
           Alert.alert('Uspeh', 'Lozinka je uspešno promenjena!');
         } else {
           Alert.alert('Uspeh', 'Podaci su uspešno ažurirani!');
         }
-        
-        // Reset password fields
         setNewOldPassword('');
         setNewNewPassword('');
         setShowOldPassword(false);
@@ -257,19 +233,16 @@ const Profile = () => {
         const textResponse = await response.text();
         try {
           const errorData = JSON.parse(textResponse);
-          setErrorMessage(
-            errorData.message || 'Greška prilikom ažuriranja podataka.'
-          );
+          setErrorMessage(errorData.message || 'Greška prilikom ažuriranja podataka.');
         } catch (error) {
-          setErrorMessage(
-            textResponse || 'Greška prilikom ažuriranja podataka.'
-          );
+          setErrorMessage(textResponse || 'Greška prilikom ažuriranja podataka.');
         }
       }
     } catch (error) {
+      console.error('Greška:', error);
       setErrorMessage('Došlo je do greške. Pokušajte ponovo.');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -284,42 +257,22 @@ const Profile = () => {
 
   const handleLogout = async () => {
     Alert.alert(
-      'Odjava',
+      'Potvrda',
       'Da li ste sigurni da se želite odjaviti?',
       [
-        { text: 'Ne', style: 'cancel' },
         {
-          text: 'Da',
+          text: 'Otkaži',
+          style: 'cancel',
+        },
+        {
+          text: 'Odjavi se',
+          style: 'destructive',
           onPress: async () => {
             try {
-              // Remove token from storage
               await AsyncStorage.removeItem('jwtToken');
-              
-              // Wait a bit to ensure token is removed
-              await new Promise(resolve => setTimeout(resolve, 100));
-              
-              // Clear all user data from state
-              setUser({
-                ime: '',
-                prezime: '',
-                email: '',
-                biography: '',
-                profileImagePath: '',
-              });
-              setRole('');
-              setDoctorId('');
-              setAppointments([]);
-              
-              // Close any open modals
-              setIsModalOpen(false);
-              setAppointmentsModalOpen(false);
-              setIsMedicalRecordModalOpen(false);
-              
-              console.log('User logged out successfully');
-              Alert.alert('Uspeh', 'Uspešno ste se odjavili!');
+              console.log('User logged out');
             } catch (error) {
-              console.error('Logout error:', error);
-              Alert.alert('Greška', 'Greška prilikom odjave');
+              console.error('Error during logout:', error);
             }
           },
         },
@@ -327,266 +280,263 @@ const Profile = () => {
     );
   };
 
-  const renderEditModal = () => {
-    if (!isModalOpen) return null;
-
-    return (
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>
-            {modalField === 'password'
-              ? 'Promena lozinke'
-              : 'Ažuriraj podatke'}
-          </Text>
-
-          {modalField === 'ime' && (
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Ime:</Text>
-              <TextInput
-                style={styles.input}
-                value={newIme}
-                onChangeText={setNewIme}
-                placeholder="Unesite ime"
-              />
-            </View>
-          )}
-
-          {modalField === 'prezime' && (
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Prezime:</Text>
-              <TextInput
-                style={styles.input}
-                value={newPrezime}
-                onChangeText={setNewPrezime}
-                placeholder="Unesite prezime"
-              />
-            </View>
-          )}
-
-          {modalField === 'biography' && (
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Biografija:</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={newBiography}
-                onChangeText={setNewBiography}
-                placeholder="Unesite biografiju"
-                multiline
-                numberOfLines={6}
-                textAlignVertical="top"
-              />
-            </View>
-          )}
-
-          {modalField === 'password' && (
-            <>
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Stara lozinka:</Text>
-                <View style={styles.passwordContainer}>
-                  <TextInput
-                    style={[styles.input, styles.passwordInput]}
-                    value={newOldPassword}
-                    onChangeText={setNewOldPassword}
-                    placeholder="Unesite staru lozinku"
-                    secureTextEntry={!showOldPassword}
-                  />
-                  <TouchableOpacity
-                    style={styles.passwordToggle}
-                    onPress={() => setShowOldPassword(!showOldPassword)}
-                  >
-                    {showOldPassword ? (
-                      <EyeOff size={20} color="#666" />
-                    ) : (
-                      <Eye size={20} color="#666" />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Nova lozinka:</Text>
-                <View style={styles.passwordContainer}>
-                  <TextInput
-                    style={[styles.input, styles.passwordInput]}
-                    value={newNewPassword}
-                    onChangeText={setNewNewPassword}
-                    placeholder="Unesite novu lozinku"
-                    secureTextEntry={!showNewPassword}
-                  />
-                  <TouchableOpacity
-                    style={styles.passwordToggle}
-                    onPress={() => setShowNewPassword(!showNewPassword)}
-                  >
-                    {showNewPassword ? (
-                      <EyeOff size={20} color="#666" />
-                    ) : (
-                      <Eye size={20} color="#666" />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </>
-          )}
-
-          {errorMessage && (
-            <Text style={styles.errorMessage}>{errorMessage}</Text>
-          )}
-
-          <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.saveButton]}
-              onPress={handleSaveModal}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.saveButtonText}>Sačuvaj</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.cancelButton]}
-              onPress={handleCloseModal}
-            >
-              <Text style={styles.cancelButtonText}>Zatvori</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    );
-  };
-
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardAvoidingView}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.profileContainer}>
-            <View style={styles.headerContainer}>
-              <Text style={styles.title}>Moj profil</Text>
-              <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                <LogOut size={20} color="#FF3B30" />
-              </TouchableOpacity>
-            </View>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.profileContainer}>
+          <Text style={styles.title}>Moj profil</Text>
+          
+          {user.profileImagePath ? (
+            <Image source={{ uri: user.profileImagePath }} style={styles.profileImage} />
+          ) : null}
 
-            {user.profileImagePath && (
-              <Image
-                source={{ uri: user.profileImagePath }}
-                style={styles.profileImage}
-              />
-            )}
-
-            <View style={styles.profileField}>
-              <Text style={styles.label}>Ime:</Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.disabledInput}
-                  value={user.ime}
-                  editable={false}
-                />
-                <TouchableOpacity
-                  style={styles.editIcon}
-                  onPress={() => handleEdit('ime')}
-                >
-                  <Pencil size={18} color="#007AFF" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.profileField}>
-              <Text style={styles.label}>Prezime:</Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.disabledInput}
-                  value={user.prezime}
-                  editable={false}
-                />
-                <TouchableOpacity
-                  style={styles.editIcon}
-                  onPress={() => handleEdit('prezime')}
-                >
-                  <Pencil size={18} color="#007AFF" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.profileField}>
-              <Text style={styles.label}>Email:</Text>
+          <View style={styles.profileField}>
+            <Text style={styles.label}>Ime:</Text>
+            <View style={styles.inputContainer}>
               <TextInput
-                style={styles.disabledInput}
-                value={user.email}
+                style={styles.input}
+                value={user.ime}
                 editable={false}
               />
-            </View>
-
-            <View style={styles.profileField}>
-              <Text style={styles.label}>Biografija:</Text>
-              <View style={styles.biographyContainer}>
-                <TextInput
-                  style={[styles.disabledInput, styles.biographyText]}
-                  value={user.biography}
-                  editable={false}
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                />
-                <TouchableOpacity
-                  style={styles.biographyEditIcon}
-                  onPress={() => handleEdit('biography')}
-                >
-                  <Pencil size={18} color="#007AFF" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.profileField}>
-              <Text style={styles.label}>Lozinka:</Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.disabledInput}
-                  value="••••••••"
-                  editable={false}
-                  secureTextEntry
-                />
-                <TouchableOpacity
-                  style={styles.editIcon}
-                  onPress={() => handleEdit('password')}
-                >
-                  <Lock size={18} color="#007AFF" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {!role.includes('Admin') && (
               <TouchableOpacity
-                style={styles.appointmentsButton}
-                onPress={handleOpenAppointmentsModal}
+                style={styles.editIcon}
+                onPress={() => handleEdit('ime')}
               >
-                <Text style={styles.appointmentsButtonText}>Vaši termini</Text>
+                <Edit3 size={20} color="#007AFF" />
               </TouchableOpacity>
-            )}
-
-            {role.includes('User') && !role.includes('Doctor') && (
-              <TouchableOpacity
-                style={styles.appointmentsButton}
-                onPress={async () => {
-                  await fetchAppointments();
-                  setIsMedicalRecordModalOpen(true);
-                }}
-              >
-                <Text style={styles.appointmentsButtonText}>Vaš karton</Text>
-              </TouchableOpacity>
-            )}
+            </View>
           </View>
 
-          {renderEditModal()}
-        </ScrollView>
-      </KeyboardAvoidingView>
+          <View style={styles.profileField}>
+            <Text style={styles.label}>Prezime:</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value={user.prezime}
+                editable={false}
+              />
+              <TouchableOpacity
+                style={styles.editIcon}
+                onPress={() => handleEdit('prezime')}
+              >
+                <Edit3 size={20} color="#007AFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.profileField}>
+            <Text style={styles.label}>Email:</Text>
+            <TextInput
+              style={styles.input}
+              value={user.email}
+              editable={false}
+            />
+          </View>
+
+          <View style={styles.profileField}>
+            <Text style={styles.label}>Biografija:</Text>
+            <View style={styles.biographyContainer}>
+              <TextInput
+                style={styles.biographyText}
+                value={user.biography}
+                editable={false}
+                multiline
+                numberOfLines={4}
+              />
+              <TouchableOpacity
+                style={styles.biographyEditIcon}
+                onPress={() => handleEdit('biography')}
+              >
+                <Edit3 size={20} color="#007AFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.profileField}>
+            <Text style={styles.label}>Lozinka:</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value="••••••••"
+                editable={false}
+                secureTextEntry
+              />
+              <TouchableOpacity
+                style={styles.editIcon}
+                onPress={() => handleEdit('password')}
+              >
+                <Lock size={20} color="#007AFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {!role.includes('Admin') && (
+            <TouchableOpacity
+              style={styles.appointmentsButton}
+              onPress={handleOpenAppointmentsModal}
+            >
+              <Text style={styles.appointmentsButtonText}>Vaši termini</Text>
+            </TouchableOpacity>
+          )}
+
+          {role.includes('User') && !role.includes('Doctor') && (
+            <TouchableOpacity
+              style={styles.appointmentsButton}
+              onPress={async () => {
+                await fetchAppointments();
+                setIsMedicalRecordModalOpen(true);
+              }}
+            >
+              <Text style={styles.appointmentsButtonText}>Vaš karton</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.logoutButtonText}>Odjavi se</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {/* Edit Modal */}
+      <Modal
+        visible={isModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {modalField === 'password' ? 'Promena lozinke' : 'Ažuriraj podatke'}
+            </Text>
+
+            {modalField === 'ime' && (
+              <View style={styles.modalField}>
+                <Text style={styles.modalLabel}>Ime:</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={newIme}
+                  onChangeText={setNewIme}
+                  placeholder="Unesite ime"
+                />
+              </View>
+            )}
+
+            {modalField === 'prezime' && (
+              <View style={styles.modalField}>
+                <Text style={styles.modalLabel}>Prezime:</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={newPrezime}
+                  onChangeText={setNewPrezime}
+                  placeholder="Unesite prezime"
+                />
+              </View>
+            )}
+
+            {modalField === 'biography' && (
+              <View style={styles.modalField}>
+                <Text style={styles.modalLabel}>Biografija:</Text>
+                <TextInput
+                  style={[styles.modalInput, styles.modalTextArea]}
+                  value={newBiography}
+                  onChangeText={setNewBiography}
+                  placeholder="Unesite biografiju"
+                  multiline
+                  numberOfLines={6}
+                />
+              </View>
+            )}
+
+            {modalField === 'password' && (
+              <>
+                <View style={styles.modalField}>
+                  <Text style={styles.modalLabel}>Stara lozinka:</Text>
+                  <View style={styles.passwordContainer}>
+                    <TextInput
+                      style={[styles.modalInput, styles.passwordInput]}
+                      value={newOldPassword}
+                      onChangeText={setNewOldPassword}
+                      placeholder="Unesite staru lozinku"
+                      secureTextEntry={!showOldPassword}
+                    />
+                    <TouchableOpacity
+                      style={styles.passwordToggle}
+                      onPress={() => setShowOldPassword(!showOldPassword)}
+                    >
+                      {showOldPassword ? (
+                        <EyeOff size={20} color="#666" />
+                      ) : (
+                        <Eye size={20} color="#666" />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={styles.modalField}>
+                  <Text style={styles.modalLabel}>Nova lozinka:</Text>
+                  <View style={styles.passwordContainer}>
+                    <TextInput
+                      style={[styles.modalInput, styles.passwordInput]}
+                      value={newNewPassword}
+                      onChangeText={setNewNewPassword}
+                      placeholder="Unesite novu lozinku"
+                      secureTextEntry={!showNewPassword}
+                    />
+                    <TouchableOpacity
+                      style={styles.passwordToggle}
+                      onPress={() => setShowNewPassword(!showNewPassword)}
+                    >
+                      {showNewPassword ? (
+                        <EyeOff size={20} color="#666" />
+                      ) : (
+                        <Eye size={20} color="#666" />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </>
+            )}
+
+            {errorMessage ? (
+              <Text style={styles.errorMessage}>{errorMessage}</Text>
+            ) : null}
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleSaveModal}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Sačuvaj</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={handleCloseModal}
+              >
+                <Text style={styles.cancelButtonText}>Zatvori</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <AllAppointmentsModal
+        isOpen={appointmentsModalOpen}
+        onClose={handleCloseAppointmentsModal}
+        appointments={appointments}
+        userRole={role}
+      />
+
+      <MedicalRecordModal
+        isOpen={isMedicalRecordModalOpen}
+        onClose={() => setIsMedicalRecordModalOpen(false)}
+        appointments={appointments}
+      />
     </SafeAreaView>
   );
 };
@@ -595,9 +545,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F7',
-  },
-  keyboardAvoidingView: {
-    flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
@@ -612,40 +559,35 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 24,
     elevation: 8,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
+    marginTop: 20,
   },
   title: {
     fontSize: 28,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#1C1C1E',
-  },
-  logoutButton: {
-    padding: 8,
-    backgroundColor: '#FEE2E2',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    textAlign: 'center',
+    marginBottom: 24,
   },
   profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
     alignSelf: 'center',
     marginBottom: 24,
     borderWidth: 4,
     borderColor: '#FFFFFF',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   profileField: {
     marginBottom: 20,
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#1C1C1E',
     marginBottom: 8,
   },
@@ -654,7 +596,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  disabledInput: {
+  input: {
     flex: 1,
     borderWidth: 2,
     borderColor: '#E2E8F0',
@@ -671,30 +613,32 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   biographyText: {
-    height: 80,
+    flex: 1,
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#1C1C1E',
+    backgroundColor: '#F5F5F7',
+    minHeight: 80,
     textAlignVertical: 'top',
   },
   editIcon: {
     padding: 8,
-    backgroundColor: '#F5F5F7',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   biographyEditIcon: {
     padding: 8,
-    backgroundColor: '#F5F5F7',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
+    marginTop: 8,
   },
   appointmentsButton: {
     backgroundColor: '#007AFF',
-    paddingVertical: 16,
-    borderRadius: 25,
+    borderRadius: 8,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 20,
+    justifyContent: 'center',
+    marginTop: 16,
     shadowColor: '#007AFF',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -703,25 +647,39 @@ const styles = StyleSheet.create({
   },
   appointmentsButtonText: {
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  logoutButton: {
+    backgroundColor: '#FF3B30',
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    shadowColor: '#FF3B30',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  logoutButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
   },
   modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000,
+    padding: 20,
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 24,
-    width: '90%',
+    padding: 32,
+    width: '100%',
     maxWidth: 400,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
@@ -731,15 +689,21 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#1C1C1E',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
-  inputGroup: {
+  modalField: {
     marginBottom: 16,
   },
-  input: {
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1C1C1E',
+    marginBottom: 8,
+  },
+  modalInput: {
     borderWidth: 2,
     borderColor: '#E2E8F0',
     borderRadius: 8,
@@ -747,10 +711,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: '#1C1C1E',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F5F5F7',
   },
-  textArea: {
-    height: 120,
+  modalTextArea: {
+    minHeight: 120,
     textAlignVertical: 'top',
   },
   passwordContainer: {
@@ -769,7 +733,7 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     fontSize: 14,
     textAlign: 'center',
-    marginBottom: 16,
+    marginTop: 16,
     padding: 12,
     backgroundColor: '#FEE2E2',
     borderRadius: 8,
@@ -777,7 +741,7 @@ const styles = StyleSheet.create({
   modalButtons: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 8,
+    marginTop: 24,
   },
   modalButton: {
     flex: 1,
@@ -797,7 +761,7 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   cancelButton: {
     backgroundColor: '#FF3B30',
@@ -805,7 +769,7 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
   },
 });
 

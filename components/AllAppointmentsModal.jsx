@@ -6,12 +6,11 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
   TextInput,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { ArrowUpDown, Clock } from 'lucide-react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
   const [isAddNotesModalOpen, setIsAddNotesModalOpen] = useState(false);
@@ -22,7 +21,7 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
   const [filters, setFilters] = useState({
     sortBy: 'nearest',
     status: 'all',
-    timeFilter: 'all',
+    timeFilter: 'all'
   });
 
   useEffect(() => {
@@ -36,16 +35,12 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
       }
 
       let filtered = [...initialAppointments];
-
+      
       // Apply time filter
       if (filters.timeFilter === 'past') {
-        filtered = filtered.filter((app) =>
-          isAppointmentPassed(app.appointmentDate)
-        );
+        filtered = filtered.filter(app => isAppointmentPassed(app.appointmentDate));
       } else if (filters.timeFilter === 'upcoming') {
-        filtered = filtered.filter(
-          (app) => !isAppointmentPassed(app.appointmentDate)
-        );
+        filtered = filtered.filter(app => !isAppointmentPassed(app.appointmentDate));
       }
 
       // Apply sorting
@@ -54,7 +49,7 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
         filtered.sort((a, b) => {
           const dateA = new Date(a.appointmentDate);
           const dateB = new Date(b.appointmentDate);
-
+          
           if (dateA > now && dateB > now) {
             return dateA - dateB;
           } else if (dateA < now && dateB < now) {
@@ -67,7 +62,7 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
         filtered.sort((a, b) => {
           const dateA = new Date(a.appointmentDate);
           const dateB = new Date(b.appointmentDate);
-
+          
           if (dateA > now && dateB > now) {
             return dateB - dateA;
           } else if (dateA < now && dateB < now) {
@@ -98,7 +93,7 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
       case 1:
         return 'Odobren';
       case 2:
-        return 'Završen';
+        return 'Zavrsen';
       case 3:
         return 'Otkazan';
       default:
@@ -122,7 +117,6 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
       Alert.alert('Greška', 'Napomena ne može biti prazna');
       return;
     }
-    
     setLoading(true);
     try {
       const response = await fetch(
@@ -155,471 +149,369 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
     return appDate < now;
   };
 
-  const renderNotesModal = () => (
-    <Modal
-      visible={isAddNotesModalOpen}
-      transparent
-      animationType="fade"
-      onRequestClose={handleCloseAddNotesModal}
-    >
-      <View style={styles.notesModalOverlay}>
-        <View style={styles.notesModalContent}>
-          <Text style={styles.notesModalTitle}>Dodaj belešku</Text>
-          <TextInput
-            style={styles.notesTextArea}
-            placeholder="Unesite napomene..."
-            value={note}
-            onChangeText={setNote}
-            multiline
-            numberOfLines={6}
-            textAlignVertical="top"
-          />
-          <View style={styles.notesModalButtons}>
-            <TouchableOpacity
-              style={[styles.notesModalButton, styles.cancelNotesButton]}
-              onPress={handleCloseAddNotesModal}
-            >
-              <Text style={styles.cancelNotesButtonText}>Zatvori</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.notesModalButton, styles.saveNotesButton]}
-              onPress={handleSaveNotes}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.saveNotesButtonText}>Spremi</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
+  if (!isOpen) return null;
 
   return (
     <>
       <Modal
         visible={isOpen}
-        animationType="slide"
-        presentationStyle="pageSheet"
+        transparent
+        animationType="fade"
         onRequestClose={onClose}
       >
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Vaši termini</Text>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Vaši termini</Text>
+
+            <View style={styles.filterSection}>
+              <View style={styles.filterRow}>
+                <Text style={styles.filterLabel}>Sortiraj:</Text>
+                <View style={styles.pickerContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.filterButton,
+                      filters.sortBy === 'nearest' && styles.activeFilter
+                    ]}
+                    onPress={() => setFilters(prev => ({ ...prev, sortBy: 'nearest' }))}
+                  >
+                    <Text style={[
+                      styles.filterButtonText,
+                      filters.sortBy === 'nearest' && styles.activeFilterText
+                    ]}>
+                      Najskoriji
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.filterButton,
+                      filters.sortBy === 'furthest' && styles.activeFilter
+                    ]}
+                    onPress={() => setFilters(prev => ({ ...prev, sortBy: 'furthest' }))}
+                  >
+                    <Text style={[
+                      styles.filterButtonText,
+                      filters.sortBy === 'furthest' && styles.activeFilterText
+                    ]}>
+                      Najdalji
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {userRole && userRole.includes('Doctor') && (
+                <View style={styles.filterRow}>
+                  <Text style={styles.filterLabel}>Vreme:</Text>
+                  <View style={styles.pickerContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.filterButton,
+                        filters.timeFilter === 'all' && styles.activeFilter
+                      ]}
+                      onPress={() => setFilters(prev => ({ ...prev, timeFilter: 'all' }))}
+                    >
+                      <Text style={[
+                        styles.filterButtonText,
+                        filters.timeFilter === 'all' && styles.activeFilterText
+                      ]}>
+                        Svi
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.filterButton,
+                        filters.timeFilter === 'past' && styles.activeFilter
+                      ]}
+                      onPress={() => setFilters(prev => ({ ...prev, timeFilter: 'past' }))}
+                    >
+                      <Text style={[
+                        styles.filterButtonText,
+                        filters.timeFilter === 'past' && styles.activeFilterText
+                      ]}>
+                        Prošli
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.filterButton,
+                        filters.timeFilter === 'upcoming' && styles.activeFilter
+                      ]}
+                      onPress={() => setFilters(prev => ({ ...prev, timeFilter: 'upcoming' }))}
+                    >
+                      <Text style={[
+                        styles.filterButtonText,
+                        filters.timeFilter === 'upcoming' && styles.activeFilterText
+                      ]}>
+                        Budući
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            <ScrollView style={styles.appointmentsList}>
+              {filteredAppointments.length > 0 ? (
+                filteredAppointments.map((appointment) => {
+                  const date = new Date(appointment.appointmentDate);
+                  const formattedDate = date.toLocaleDateString('sr-RS', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                  });
+                  const formattedTime = date.toLocaleTimeString('sr-RS', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  });
+
+                  const appointmentPassed = isAppointmentPassed(appointment.appointmentDate);
+
+                  return (
+                    <View
+                      key={appointment.id}
+                      style={[
+                        styles.appointmentItem,
+                        appointmentPassed ? styles.pastAppointment : styles.upcomingAppointment
+                      ]}
+                    >
+                      <View style={styles.appointmentInfo}>
+                        <Text style={styles.appointmentText}>
+                          <Text style={styles.boldText}>Datum:</Text> {formattedDate}
+                        </Text>
+                        <Text style={styles.appointmentText}>
+                          <Text style={styles.boldText}>Vreme:</Text> {formattedTime}
+                          <Text style={[
+                            styles.timeIndicator,
+                            appointmentPassed ? styles.timePast : styles.timeFuture
+                          ]}>
+                            {appointmentPassed ? ' (Prošao)' : ' (Predstoji)'}
+                          </Text>
+                        </Text>
+                        <Text style={styles.appointmentText}>
+                          <Text style={styles.boldText}>Usluga:</Text> {appointment.serviceName}
+                        </Text>
+                        <Text style={styles.appointmentText}>
+                          <Text style={styles.boldText}>Status:</Text> {getStatusText(appointment.status)}
+                        </Text>
+                      </View>
+                      
+                      {userRole &&
+                        userRole.includes('Doctor') &&
+                        appointment.status !== 2 &&
+                        appointmentPassed && (
+                          <TouchableOpacity
+                            style={styles.addNotesButton}
+                            onPress={() => handleOpenAddNotesModal(appointment.id)}
+                          >
+                            <Text style={styles.addNotesButtonText}>Dodaj belešku</Text>
+                          </TouchableOpacity>
+                        )}
+                    </View>
+                  );
+                })
+              ) : (
+                <Text style={styles.noAppointmentsText}>Nemate zakazane termine.</Text>
+              )}
+            </ScrollView>
+
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
               <Text style={styles.closeButtonText}>Zatvori</Text>
             </TouchableOpacity>
           </View>
-
-          <View style={styles.filterSection}>
-            <View style={styles.filterRow}>
-              <Text style={styles.filterLabel}>Sortiraj:</Text>
-              <View style={styles.pickerContainer}>
-                <TouchableOpacity
-                  style={styles.picker}
-                  onPress={() => {
-                    Alert.alert('Sortiranje', 'Izaberite opciju', [
-                      {
-                        text: 'Najskoriji prvo',
-                        onPress: () =>
-                          setFilters((prev) => ({ ...prev, sortBy: 'nearest' })),
-                      },
-                      {
-                        text: 'Najdalji prvo',
-                        onPress: () =>
-                          setFilters((prev) => ({ ...prev, sortBy: 'furthest' })),
-                      },
-                      { text: 'Otkaži', style: 'cancel' },
-                    ]);
-                  }}
-                >
-                  <Text style={styles.pickerText}>
-                    {filters.sortBy === 'nearest'
-                      ? 'Najskoriji prvo'
-                      : 'Najdalji prvo'}
-                  </Text>
-                  <ArrowUpDown size={16} color="#666" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {userRole && userRole.includes('Doctor') && (
-              <View style={styles.filterRow}>
-                <Text style={styles.filterLabel}>Vreme:</Text>
-                <View style={styles.pickerContainer}>
-                  <TouchableOpacity
-                    style={styles.picker}
-                    onPress={() => {
-                      Alert.alert('Vreme', 'Izaberite opciju', [
-                        {
-                          text: 'Svi termini',
-                          onPress: () =>
-                            setFilters((prev) => ({
-                              ...prev,
-                              timeFilter: 'all',
-                            })),
-                        },
-                        {
-                          text: 'Prošli termini',
-                          onPress: () =>
-                            setFilters((prev) => ({
-                              ...prev,
-                              timeFilter: 'past',
-                            })),
-                        },
-                        {
-                          text: 'Budući termini',
-                          onPress: () =>
-                            setFilters((prev) => ({
-                              ...prev,
-                              timeFilter: 'upcoming',
-                            })),
-                        },
-                        { text: 'Otkaži', style: 'cancel' },
-                      ]);
-                    }}
-                  >
-                    <Text style={styles.pickerText}>
-                      {filters.timeFilter === 'all'
-                        ? 'Svi termini'
-                        : filters.timeFilter === 'past'
-                        ? 'Prošli termini'
-                        : 'Budući termini'}
-                    </Text>
-                    <Clock size={16} color="#666" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            <View style={styles.filterRow}>
-              <Text style={styles.filterLabel}>Status:</Text>
-              <View style={styles.pickerContainer}>
-                <TouchableOpacity
-                  style={styles.picker}
-                  onPress={() => {
-                    const options = [
-                      { text: 'Svi statusi', value: 'all' },
-                      ...(userRole === 'User'
-                        ? [{ text: 'Čeka se odobrenje', value: '0' }]
-                        : []),
-                      { text: 'Odobren', value: '1' },
-                      ...(userRole === 'User'
-                        ? [{ text: 'Otkazan', value: '3' }]
-                        : [{ text: 'Završen', value: '2' }]),
-                    ];
-
-                    Alert.alert(
-                      'Status',
-                      'Izaberite opciju',
-                      [
-                        ...options.map((option) => ({
-                          text: option.text,
-                          onPress: () =>
-                            setFilters((prev) => ({
-                              ...prev,
-                              status: option.value,
-                            })),
-                        })),
-                        { text: 'Otkaži', style: 'cancel' },
-                      ]
-                    );
-                  }}
-                >
-                  <Text style={styles.pickerText}>
-                    {filters.status === 'all'
-                      ? 'Svi statusi'
-                      : getStatusText(parseInt(filters.status))}
-                  </Text>
-                  <ArrowUpDown size={16} color="#666" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-
-          <ScrollView style={styles.appointmentsList}>
-            {filteredAppointments.length > 0 ? (
-              filteredAppointments.map((appointment) => {
-                const date = new Date(appointment.appointmentDate);
-                const formattedDate = date.toLocaleDateString('sr-RS', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                });
-                const formattedTime = date.toLocaleTimeString('sr-RS', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                });
-
-                const appointmentPassed = isAppointmentPassed(
-                  appointment.appointmentDate
-                );
-
-                return (
-                  <View
-                    key={appointment.id}
-                    style={[
-                      styles.appointmentCard,
-                      appointmentPassed
-                        ? styles.pastAppointment
-                        : styles.upcomingAppointment,
-                    ]}
-                  >
-                    <View style={styles.appointmentHeader}>
-                      <Text style={styles.appointmentDate}>
-                        {formattedDate}
-                      </Text>
-                      <View style={styles.timeContainer}>
-                        <Text style={styles.appointmentTime}>
-                          {formattedTime}
-                        </Text>
-                        <View
-                          style={[
-                            styles.timeBadge,
-                            appointmentPassed
-                              ? styles.pastTimeBadge
-                              : styles.futureTimeBadge,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.timeBadgeText,
-                              appointmentPassed
-                                ? styles.pastTimeBadgeText
-                                : styles.futureTimeBadgeText,
-                            ]}
-                          >
-                            {appointmentPassed ? 'Prošao' : 'Predstoji'}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-
-                    <Text style={styles.appointmentService}>
-                      <Text style={styles.appointmentLabel}>Usluga: </Text>
-                      {appointment.serviceName}
-                    </Text>
-
-                    <Text style={styles.appointmentStatus}>
-                      <Text style={styles.appointmentLabel}>Status: </Text>
-                      {getStatusText(appointment.status)}
-                    </Text>
-
-                    {userRole &&
-                      userRole.includes('Doctor') &&
-                      appointment.status !== 2 &&
-                      appointmentPassed && (
-                        <TouchableOpacity
-                          style={styles.addNotesButton}
-                          onPress={() =>
-                            handleOpenAddNotesModal(appointment.id)
-                          }
-                        >
-                          <Text style={styles.addNotesButtonText}>
-                            Dodaj belešku
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                  </View>
-                );
-              })
-            ) : (
-              <View style={styles.noAppointmentsContainer}>
-                <Text style={styles.noAppointmentsText}>
-                  Nemate zakazane termine.
-                </Text>
-              </View>
-            )}
-          </ScrollView>
         </View>
       </Modal>
 
-      {renderNotesModal()}
+      {/* Notes Modal */}
+      <Modal
+        visible={isAddNotesModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseAddNotesModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.notesModalContent}>
+            <Text style={styles.modalTitle}>Dodaj belešku</Text>
+            <TextInput
+              style={styles.notesTextArea}
+              placeholder="Unesite napomene..."
+              value={note}
+              onChangeText={setNote}
+              multiline
+              numberOfLines={6}
+            />
+            <View style={styles.notesModalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={handleCloseAddNotesModal}
+              >
+                <Text style={styles.cancelButtonText}>Zatvori</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleSaveNotes}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Spremi</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F7',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E7',
-    backgroundColor: '#FFFFFF',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1C1C1E',
-  },
-  closeButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  closeButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  filterSection: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E7',
-  },
-  filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  filterLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    width: 80,
-  },
-  pickerContainer: {
-    flex: 1,
-  },
-  picker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F5F5F7',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E5E7',
-  },
-  pickerText: {
-    fontSize: 14,
-    color: '#1C1C1E',
-  },
-  appointmentsList: {
-    flex: 1,
-    padding: 16,
-  },
-  appointmentCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  pastAppointment: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#8C8C8C',
-    backgroundColor: '#F8F8F8',
-  },
-  upcomingAppointment: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
-  },
-  appointmentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  appointmentDate: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1C1C1E',
-  },
-  timeContainer: {
-    alignItems: 'flex-end',
-  },
-  appointmentTime: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  timeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  pastTimeBadge: {
-    backgroundColor: '#F1F1F1',
-  },
-  futureTimeBadge: {
-    backgroundColor: '#E6F7E6',
-  },
-  timeBadgeText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  pastTimeBadgeText: {
-    color: '#666',
-  },
-  futureTimeBadgeText: {
-    color: '#2E7D32',
-  },
-  appointmentLabel: {
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  appointmentService: {
-    fontSize: 14,
-    color: '#1C1C1E',
-    marginBottom: 4,
-  },
-  appointmentStatus: {
-    fontSize: 14,
-    color: '#1C1C1E',
-    marginBottom: 8,
-  },
-  addNotesButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-    marginTop: 8,
-  },
-  addNotesButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  noAppointmentsContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  noAppointmentsText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  notesModalOverlay: {
+  modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 500,
+    maxHeight: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    textAlign: 'center',
+    marginBottom: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: '#E2E8F0',
+    paddingBottom: 12,
+  },
+  filterSection: {
+    backgroundColor: '#F8F9FA',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  filterRow: {
+    marginBottom: 12,
+  },
+  filterLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  pickerContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  filterButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  activeFilter: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  filterButtonText: {
+    fontSize: 12,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  activeFilterText: {
+    color: '#FFFFFF',
+  },
+  appointmentsList: {
+    flex: 1,
+    marginBottom: 16,
+  },
+  appointmentItem: {
+    backgroundColor: '#F5F5F7',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+  },
+  pastAppointment: {
+    borderLeftColor: '#8C8C8C',
+    backgroundColor: '#F5F5F5',
+  },
+  upcomingAppointment: {
+    borderLeftColor: '#4CAF50',
+  },
+  appointmentInfo: {
+    marginBottom: 8,
+  },
+  appointmentText: {
+    fontSize: 14,
+    color: '#1C1C1E',
+    marginBottom: 4,
+  },
+  boldText: {
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  timeIndicator: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  timePast: {
+    color: '#666',
+  },
+  timeFuture: {
+    color: '#2E7D32',
+  },
+  addNotesButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  addNotesButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  noAppointmentsText: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 16,
+    fontStyle: 'italic',
+    padding: 32,
+    backgroundColor: '#F5F5F7',
+    borderRadius: 8,
+  },
+  closeButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
   },
   notesModalContent: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 24,
-    width: '90%',
+    width: '100%',
     maxWidth: 400,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
@@ -627,23 +519,15 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 8,
   },
-  notesModalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1C1C1E',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
   notesTextArea: {
     borderWidth: 2,
     borderColor: '#E2E8F0',
     borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    padding: 12,
     fontSize: 16,
     color: '#1C1C1E',
-    backgroundColor: '#FFFFFF',
-    height: 120,
+    backgroundColor: '#F5F5F7',
+    minHeight: 120,
     textAlignVertical: 'top',
     marginBottom: 20,
   },
@@ -651,33 +535,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  notesModalButton: {
+  modalButton: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cancelNotesButton: {
-    backgroundColor: '#E5E5E7',
-  },
-  cancelNotesButtonText: {
-    color: '#1C1C1E',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  saveNotesButton: {
+  saveButton: {
     backgroundColor: '#007AFF',
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
   },
-  saveNotesButtonText: {
+  saveButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
+  },
+  cancelButton: {
+    backgroundColor: '#FF3B30',
+  },
+  cancelButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 

@@ -55,14 +55,22 @@ const Login = () => {
       setSuccessMessage('Uspešno ste se prijavili!');
       await AsyncStorage.setItem('jwtToken', data.jwtToken);
       
-      // Wait a bit to ensure token is saved
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait a bit to ensure token is saved and clear form
+      await new Promise(resolve => setTimeout(resolve, 200));
       
       // Clear form
       setEmail('');
       setPassword('');
       
-      Alert.alert('Uspeh', 'Uspešno ste se prijavili!');
+      Alert.alert('Uspeh', 'Uspešno ste se prijavili!', [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Tab layout will automatically detect the change
+            console.log('Login successful, token saved');
+          }
+        }
+      ]);
     } catch (err) {
       setError(err.message || 'Došlo je do greške prilikom prijave.');
     } finally {
