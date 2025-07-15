@@ -434,26 +434,22 @@ const Staff = () => {
           >
             <View style={styles.modalOverlay}>
               <View style={styles.requestsModalContent}>
-                <Text style={styles.modalTitle}>Zahtevi za role</Text>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Zahtevi za pridruživanje</Text>
+                </View>
                 
                 {requestsLoading ? (
-                  <View style={styles.loadingContainer}>
+                  <View style={[styles.loadingContainer, styles.requestsContainer]}>
                     <ActivityIndicator size="large" color="#007AFF" />
                     <Text style={styles.loadingText}>Učitavanje zahteva...</Text>
                   </View>
                 ) : (
-                  <>
-                    {requests.length === 0 ? (
-                      <Text style={styles.noRequestsMessage}>Nema pristiglih zahteva</Text>
-                    ) : (
-                      <View style={styles.requestsContainer}>
-                        <RoleRequests
-                          requests={requests}
-                          onAction={handleRequestAction}
-                        />
-                      </View>
-                    )}
-                  </>
+                  <View style={styles.requestsContainer}>
+                    <RoleRequests
+                      requests={requests}
+                      onAction={handleRequestAction}
+                    />
+                  </View>
                 )}
                 
                 <TouchableOpacity
@@ -498,7 +494,7 @@ const Staff = () => {
                       <View style={styles.doctorModalBiography}>
                         <Text style={styles.biographyTitle}>Biografija</Text>
                         <Text style={styles.biographyText}>
-                          {selectedDoctor.biography}
+                          {selectedDoctor.biography || 'Biografija nije dostupna.'}
                         </Text>
                       </View>
                     </ScrollView>
@@ -651,6 +647,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     paddingHorizontal: 20,
     paddingVertical: 12,
+    marginHorizontal: 24,
+    marginBottom: 24,
     borderRadius: 12,
   },
   retryButtonText: {
@@ -667,39 +665,45 @@ const styles = StyleSheet.create({
   requestsModalContent: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    width: '90%',
+    width: '95%',
     maxWidth: 600,
-    maxHeight: '85%',
-    padding: 20,
+    maxHeight: '80%',
+    height: '90%',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  modalHeader: {
+    paddingTop: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
   },
   requestsContainer: {
     flex: 1,
-    minHeight: 200,
-    maxHeight: 500,
+    paddingHorizontal: 24,
+    marginBottom: 16,
   },
   modalTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '700',
     color: '#1C1C1E',
-    marginBottom: 16,
     textAlign: 'center',
   },
   noRequestsMessage: {
     textAlign: 'center',
-    fontSize: 18,
+    fontSize: 20,
     color: '#666666',
-    padding: 40,
+    padding: 50,
   },
   closeButton: {
     backgroundColor: '#F2F2F7',
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 16,
+    borderRadius: 14,
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 20,
   },
   closeButtonText: {
     color: '#1C1C1E',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
   },
   doctorModalContent: {
@@ -728,7 +732,7 @@ const styles = StyleSheet.create({
   },
   doctorModalName: {
     fontSize: 24,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#FFFFFF',
     marginBottom: 4,
   },
@@ -760,6 +764,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
+    marginTop: 20,
   },
   doctorModalCloseText: {
     color: '#FFFFFF',

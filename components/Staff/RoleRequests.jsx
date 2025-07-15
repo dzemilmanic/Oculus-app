@@ -12,7 +12,6 @@ const RoleRequests = ({ requests, onAction }) => {
   if (!requests || !Array.isArray(requests) || requests.length === 0) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Zahtevi za pridruživanje</Text>
         <Text style={styles.noRequestsMessage}>Nema pristiglih zahteva</Text>
       </View>
     );
@@ -20,8 +19,6 @@ const RoleRequests = ({ requests, onAction }) => {
   
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Zahtevi za pridruživanje</Text>
-      
       <ScrollView 
         style={styles.scrollContainer}
         showsVerticalScrollIndicator={true}
@@ -55,18 +52,16 @@ const RoleRequests = ({ requests, onAction }) => {
               
               <View style={styles.requestActions}>
                 <TouchableOpacity
-                  style={[styles.actionButton, styles.approveButton]}
+                  style={[styles.iconButton, styles.approveButton]}
                   onPress={() => onAction(request.id, 'approve')}
                 >
-                  <Text style={styles.approveButtonText}>✓</Text>
-                  <Text style={styles.buttonLabel}>Odobri</Text>
+                  <Text style={styles.approveIcon}>✔️</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.actionButton, styles.rejectButton]}
+                  style={[styles.iconButton, styles.rejectButton]}
                   onPress={() => onAction(request.id, 'reject')}
                 >
-                  <Text style={styles.rejectButtonText}>✕</Text>
-                  <Text style={styles.buttonLabel}>Odbij</Text>
+                  <Text style={styles.rejectIcon}>❌</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -80,79 +75,65 @@ const RoleRequests = ({ requests, onAction }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    maxHeight: 500,
   },
   scrollContainer: {
     flex: 1,
-    maxHeight: 400,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#1C1C1E',
-    marginBottom: 20,
-    textAlign: 'center',
   },
   noRequestsMessage: {
     textAlign: 'center',
-    fontSize: 18,
-    color: '#8E8E93',
+    fontSize: 16,
+    color: '#6B7280',
     padding: 40,
     fontStyle: 'italic',
   },
   requestItem: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 16,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 20,
     gap: 16,
+    marginBottom: 16,
   },
   profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 3,
-    borderColor: '#007AFF',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
   },
   userDetails: {
     flex: 1,
   },
   userName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1C1C1E',
-    marginBottom: 12,
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#1F2937',
+    marginBottom: 8,
   },
   biographyContainer: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    padding: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
+    flex: 1,
   },
   biographyLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#007AFF',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   userBiography: {
-    fontSize: 15,
-    color: '#374151',
-    lineHeight: 22,
-    textAlign: 'justify',
+    fontSize: 14,
+    color: '#4B5563',
+    lineHeight: 21,
   },
   requestActions: {
     flexDirection: 'row',
