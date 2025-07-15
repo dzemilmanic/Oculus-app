@@ -3,30 +3,20 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Pencil, Trash2 } from 'lucide-react-native';
 
 const NewsCard = ({ id, title, content, publishedDate, isAdmin, onEdit, onDelete }) => {
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('sr-RS', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
   return (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.title} numberOfLines={2}>
-          {title}
-        </Text>
+    <View style={styles.newsCard}>
+      <View style={styles.newsCardHeader}>
+        <Text style={styles.newsTitle}>{title}</Text>
         {isAdmin && (
-          <View style={styles.actions}>
+          <View style={styles.newsCardActions}>
             <TouchableOpacity
-              style={styles.actionButton}
+              style={styles.iconButton}
               onPress={() => onEdit(id)}
             >
               <Pencil size={18} color="#007AFF" />
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.actionButton}
+              style={styles.iconButton}
               onPress={() => onDelete(id)}
             >
               <Trash2 size={18} color="#FF3B30" />
@@ -34,16 +24,16 @@ const NewsCard = ({ id, title, content, publishedDate, isAdmin, onEdit, onDelete
           </View>
         )}
       </View>
-      <Text style={styles.content} numberOfLines={4}>
-        {content}
+      <Text style={styles.newsContent}>{content}</Text>
+      <Text style={styles.newsDate}>
+        {new Date(publishedDate).toLocaleDateString()}
       </Text>
-      <Text style={styles.date}>{formatDate(publishedDate)}</Text>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
+  newsCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
@@ -51,47 +41,46 @@ const styles = StyleSheet.create({
     shadowColor: '#007AFF',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
     borderWidth: 1,
-    borderColor: 'rgba(0, 122, 255, 0.1)',
+    borderColor: 'rgba(0, 102, 255, 0.1)',
   },
-  cardHeader: {
+  newsCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 16,
   },
-  title: {
+  newsTitle: {
+    flex: 1,
     fontSize: 18,
     fontWeight: '700',
     color: '#1C1C1E',
-    flex: 1,
     lineHeight: 24,
+    marginRight: 12,
   },
-  actions: {
+  newsCardActions: {
     flexDirection: 'row',
-    gap: 12,
-    marginLeft: 16,
+    gap: 8,
   },
-  actionButton: {
-    backgroundColor: '#F5F5F7',
+  iconButton: {
+    backgroundColor: '#F2F2F7',
     padding: 10,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  content: {
+  newsContent: {
     fontSize: 16,
-    color: '#666',
+    color: '#666666',
     lineHeight: 22,
     marginBottom: 16,
   },
-  date: {
+  newsDate: {
     fontSize: 14,
-    color: '#8E8E93',
+    color: '#666666',
     fontWeight: '500',
-    marginTop: 'auto',
   },
 });
 

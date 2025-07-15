@@ -2,33 +2,51 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  SafeAreaView,
   StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  Modal,
   RefreshControl,
 } from 'react-native';
 import { ArrowUpDown } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import NewsCard from '../../components/NewsCard';
-import AddNewsModal from '../../components/AddNewsModal';
+import { useFocusEffect } from '@react-navigation/native';
+import NewsCard from '../../components/News/NewsCard';
+import AddNewsModal from '../../components/News/AddNewsModal';
+import { getUserRoleFromToken } from '../../utils/tokenUtils';
 
 const News = () => {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [editNews, setEditNews] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [newsToDeleteId, setNewsToDeleteId] = useState(null);
   const [sortOrder, setSortOrder] = useState('desc');
   const [userRole, setUserRole] = useState('User');
-  const [refreshing, setRefreshing] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     fetchNews();
-    checkUserRole();
+  }, []);
+
+  // Check auth status when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      checkUserRole();
+    }, [])
+  );
+
+  // Also check periodically for auth changes
+  useEffect(() => {
+    const interval = setInterval(checkUserRole, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchNews = async () => {
@@ -42,16 +60,18 @@ const News = () => {
       const data = await response.json();
       setNews(data);
       setLoading(false);
+      setRefreshing(false);
     } catch (error) {
       setError(error.message);
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const onRefresh = async () => {
+  const onRefresh = () => {
     setRefreshing(true);
-    await fetchNews();
-    setRefreshing(false);
+    fetchNews();
+    checkUserRole();
   };
 
   const toggleSortOrder = () => {
@@ -65,24 +85,27 @@ const News = () => {
     setNews(sortedNews);
   };
 
-  const checkUserRole = async () => {
+  const checkUserRole = React.useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
-      if (token) {
-        const payload = token.split('.')[1];
-        const decodedPayload = JSON.parse(
-          Buffer.from(payload, 'base64').toString()
-        );
-        const roles =
-          decodedPayload[
-            'http://schemas.microsoft.com/ws/2008/06/identity/claims/role'
-          ] || 'User';
-        setUserRole(roles);
+      console.log('Checking user role, token exists:', !!token);
+      
+      if (token && token.trim() !== '') {
+        const role = getUserRoleFromToken(token);
+        console.log('User role from token:', role);
+        setUserRole(role || 'User');
+        setIsLoggedIn(true);
+      } else {
+        console.log('No token found, setting as User');
+        setUserRole('User');
+        setIsLoggedIn(false);
       }
     } catch (error) {
-      setError('Error decoding token.');
+      console.error('Error checking user role:', error);
+      setUserRole('User');
+      setIsLoggedIn(false);
     }
-  };
+  }, []);
 
   const handleAddNews = async (title, content) => {
     if (title.length < 2 || content.length < 10) {
@@ -94,6 +117,11 @@ const News = () => {
 
     try {
       const token = await AsyncStorage.getItem('jwtToken');
+      if (!token) {
+        Alert.alert('Greška', 'Niste prijavljeni. Molimo prijavite se ponovo.');
+        return;
+      }
+      
       const response = await fetch(
         'https://klinikabackend-production.up.railway.app/api/News',
         {
@@ -111,6 +139,12 @@ const News = () => {
       );
 
       if (!response.ok) {
+        if (response.status === 401) {
+          Alert.alert('Greška', 'Nemate dozvolu. Molimo prijavite se ponovo.');
+          await AsyncStorage.removeItem('jwtToken');
+          checkUserRole();
+          return;
+        }
         throw new Error('Error adding news.');
       }
 
@@ -118,13 +152,17 @@ const News = () => {
       setNews([addedNews, ...news]);
       setIsModalOpen(false);
       setErrorMessage('');
-      Alert.alert('Uspeh', 'Vest je uspešno dodana!');
     } catch (error) {
       setErrorMessage(error.message);
     }
   };
 
   const handleEditNews = (id) => {
+    // Double check if user is still admin
+    if (userRole !== 'Admin') {
+      Alert.alert('Greška', 'Nemate dozvolu za ovu akciju.');
+      return;
+    }
     const newsToEdit = news.find((item) => item.id === id);
     setEditNews(newsToEdit);
     setIsModalOpen(true);
@@ -140,6 +178,11 @@ const News = () => {
 
     try {
       const token = await AsyncStorage.getItem('jwtToken');
+      if (!token) {
+        Alert.alert('Greška', 'Niste prijavljeni. Molimo prijavite se ponovo.');
+        return;
+      }
+      
       const response = await fetch(
         `https://klinikabackend-production.up.railway.app/api/News/${editNews.id}`,
         {
@@ -158,6 +201,12 @@ const News = () => {
       );
 
       if (!response.ok) {
+        if (response.status === 401) {
+          Alert.alert('Greška', 'Nemate dozvolu. Molimo prijavite se ponovo.');
+          await AsyncStorage.removeItem('jwtToken');
+          checkUserRole();
+          return;
+        }
         throw new Error('Error updating news.');
       }
 
@@ -170,28 +219,32 @@ const News = () => {
       setEditNews(null);
       setIsModalOpen(false);
       setErrorMessage('');
-      Alert.alert('Uspeh', 'Vest je uspešno ažurirana!');
     } catch (error) {
       setErrorMessage(error.message);
     }
   };
 
-  const handleDeleteNews = (id) => {
-    Alert.alert(
-      'Potvrda',
-      'Da li ste sigurni da želite da obrišete ovu vest?',
-      [
-        { text: 'Ne', style: 'cancel' },
-        { text: 'Da', onPress: () => confirmDelete(id) },
-      ]
-    );
+  const handleDeleteNewsIconClick = (id) => {
+    // Double check if user is still admin
+    if (userRole !== 'Admin') {
+      Alert.alert('Greška', 'Nemate dozvolu za ovu akciju.');
+      return;
+    }
+    setNewsToDeleteId(id);
+    setShowDeleteModal(true);
   };
 
-  const confirmDelete = async (id) => {
+  const confirmDelete = async () => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
+      if (!token) {
+        Alert.alert('Greška', 'Niste prijavljeni. Molimo prijavite se ponovo.');
+        setShowDeleteModal(false);
+        return;
+      }
+      
       const response = await fetch(
-        `https://klinikabackend-production.up.railway.app/api/News/${id}`,
+        `https://klinikabackend-production.up.railway.app/api/News/${newsToDeleteId}`,
         {
           method: 'DELETE',
           headers: {
@@ -201,14 +254,30 @@ const News = () => {
       );
 
       if (!response.ok) {
+        if (response.status === 401) {
+          Alert.alert('Greška', 'Nemate dozvolu. Molimo prijavite se ponovo.');
+          await AsyncStorage.removeItem('jwtToken');
+          checkUserRole();
+          setShowDeleteModal(false);
+          return;
+        }
         throw new Error('Error deleting news.');
       }
 
-      setNews(news.filter((item) => item.id !== id));
-      Alert.alert('Uspeh', 'Vest je uspešno izbrisana!');
+      setNews(news.filter((item) => item.id !== newsToDeleteId));
+      Alert.alert('Uspeh', 'Vest uspešno izbrisana!');
+      setShowDeleteModal(false);
+      setNewsToDeleteId(null);
     } catch (error) {
       setError(error.message);
+      setShowDeleteModal(false);
+      setNewsToDeleteId(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setNewsToDeleteId(null);
   };
 
   const handleCloseModal = () => {
@@ -217,12 +286,21 @@ const News = () => {
     setErrorMessage('');
   };
 
+  const handleAddButtonPress = () => {
+    // Double check if user is still admin
+    if (userRole !== 'Admin') {
+      Alert.alert('Greška', 'Nemate dozvolu za ovu akciju.');
+      return;
+    }
+    setIsModalOpen(true);
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Učitavanje...</Text>
+          <Text style={styles.loadingText}>Učitavanje vesti...</Text>
         </View>
       </SafeAreaView>
     );
@@ -233,25 +311,27 @@ const News = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Greška: {error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchNews}>
+            <Text style={styles.retryButtonText}>Pokušaj ponovo</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  const isAdmin = userRole === 'Admin';
+  const isAdmin = isLoggedIn && userRole === 'Admin';
+  console.log('Render - isLoggedIn:', isLoggedIn, 'userRole:', userRole, 'isAdmin:', isAdmin);
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
+      <View style={styles.newsContainer}>
         <View style={styles.header}>
           <Text style={styles.title}>Vesti</Text>
-          <View style={styles.controls}>
-            <TouchableOpacity style={styles.sortButton} onPress={toggleSortOrder}>
+          <View style={styles.newsControls}>
+            <TouchableOpacity
+              style={styles.sortButton}
+              onPress={toggleSortOrder}
+            >
               <ArrowUpDown size={20} color="#007AFF" />
               <Text style={styles.sortButtonText}>
                 {sortOrder === 'desc' ? 'Najnovije prvo' : 'Najstarije prvo'}
@@ -260,17 +340,24 @@ const News = () => {
             {isAdmin && (
               <TouchableOpacity
                 style={styles.addButton}
-                onPress={() => setIsModalOpen(true)}
+                onPress={handleAddButtonPress}
               >
-                <Text style={styles.addButtonText}>Dodaj novu vest</Text>
+                <Text style={styles.addButtonText}>Dodaj vest</Text>
               </TouchableOpacity>
             )}
           </View>
         </View>
 
-        <View style={styles.newsContainer}>
+        <ScrollView
+          style={styles.scrollView}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
           {news.length === 0 ? (
-            <Text style={styles.noNewsText}>Nema još objavljenih vesti.</Text>
+            <Text style={styles.noNewsMessage}>
+              Nema još objavljenih vesti.
+            </Text>
           ) : (
             news.map((newsItem) => (
               <NewsCard
@@ -278,11 +365,11 @@ const News = () => {
                 {...newsItem}
                 isAdmin={isAdmin}
                 onEdit={handleEditNews}
-                onDelete={() => handleDeleteNews(newsItem.id)}
+                onDelete={() => handleDeleteNewsIconClick(newsItem.id)}
               />
             ))
           )}
-        </View>
+        </ScrollView>
 
         <AddNewsModal
           isOpen={isModalOpen}
@@ -292,7 +379,37 @@ const News = () => {
           errorMessage={errorMessage}
           editNews={editNews}
         />
-      </ScrollView>
+
+        {/* Delete Confirmation Modal */}
+        <Modal
+          visible={showDeleteModal}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={cancelDelete}
+        >
+          <View style={styles.deleteModalOverlay}>
+            <View style={styles.deleteModalContent}>
+              <Text style={styles.deleteModalTitle}>
+                Da li ste sigurni da želite da obrišete ovu vest?
+              </Text>
+              <View style={styles.deleteModalActions}>
+                <TouchableOpacity
+                  style={styles.confirmButton}
+                  onPress={confirmDelete}
+                >
+                  <Text style={styles.confirmButtonText}>Da</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={cancelDelete}
+                >
+                  <Text style={styles.cancelButtonText}>Ne</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </View>
     </SafeAreaView>
   );
 };
@@ -300,10 +417,64 @@ const News = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: '#F2F2F7',
   },
-  scrollContent: {
-    padding: 20,
+  newsContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  header: {
+    paddingVertical: 20,
+    paddingTop: 40,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  newsControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  sortButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(0, 122, 255, 0.2)',
+    gap: 8,
+    flex: 1,
+  },
+  sortButtonText: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  addButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  scrollView: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -311,9 +482,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: '#666666',
   },
   errorContainer: {
     flex: 1,
@@ -325,67 +496,74 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#FF3B30',
     textAlign: 'center',
-  },
-  header: {
-    marginBottom: 30,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#1C1C1E',
     marginBottom: 20,
-    textAlign: 'center',
   },
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  sortButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    gap: 8,
   },
-  sortButtonText: {
-    color: '#007AFF',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  addButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 25,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  addButtonText: {
+  retryButtonText: {
     color: '#FFFFFF',
-    fontWeight: '600',
     fontSize: 16,
+    fontWeight: '600',
   },
-  newsContainer: {
-    gap: 20,
-  },
-  noNewsText: {
+  noNewsMessage: {
     textAlign: 'center',
     fontSize: 18,
-    color: '#666',
-    marginTop: 40,
+    color: '#666666',
+    marginTop: 50,
     fontWeight: '500',
+  },
+  deleteModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteModalContent: {
+    backgroundColor: '#FFFFFF',
+    padding: 24,
+    borderRadius: 16,
+    width: '80%',
+    maxWidth: 400,
+  },
+  deleteModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  deleteModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  confirmButton: {
+    flex: 1,
+    backgroundColor: '#FF3B30',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  confirmButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#1C1C1E',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
