@@ -15,13 +15,78 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
+  Dimensions,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { Pencil, Trash2, Search, X } from 'lucide-react-native';
+import { Pencil, Trash2, Search, X, ChevronDown, Check } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserRoleFromToken, isTokenValid, decodeJWTToken } from '@/utils/tokenUtils';
 import AppointmentModal from '@/components/AppointmentModal';
+
+const { height: screenHeight } = Dimensions.get('window');
+
+const CustomSelector = ({ label, value, options, onValueChange, placeholder = "Odaberite opciju" }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const selectedOption = options.find(opt => opt.value === value);
+  
+  return (
+    <View style={styles.customSelectorContainer}>
+      <Text style={styles.selectorLabel}>{label}</Text>
+      <TouchableOpacity
+        style={styles.selectorButton}
+        onPress={() => setIsOpen(!isOpen)}
+        activeOpacity={0.7}
+      >
+        <Text style={[
+          styles.selectorButtonText,
+          !selectedOption && styles.placeholderText
+        ]}>
+          {selectedOption?.label || placeholder}
+        </Text>
+        <ChevronDown 
+          size={16} 
+          color="#6B7280"
+          style={[styles.chevron, isOpen && styles.chevronUp]}
+        />
+      </TouchableOpacity>
+      
+      {isOpen && (
+        <View style={styles.selectorDropdown}>
+          <ScrollView 
+            style={styles.selectorScrollView}
+            showsVerticalScrollIndicator={true}
+            nestedScrollEnabled={true}
+            keyboardShouldPersistTaps="handled"
+          >
+            {options.map((option) => (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.selectorOption,
+                  value === option.value && styles.selectorOptionSelected
+                ]}
+                onPress={() => {
+                  onValueChange(option.value);
+                  setIsOpen(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={[
+                  styles.selectorOptionText,
+                  value === option.value && styles.selectorOptionTextSelected
+                ]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </View>
+  );
+};
 
 const Services = () => {
   const [services, setServices] = useState([]);
@@ -32,6 +97,7 @@ const Services = () => {
     categoryId: '',
   });
   const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showModal2, setShowModal2] = useState(false);
   const [name, setName] = useState('');
@@ -100,13 +166,8 @@ const Services = () => {
     }
   }, [checkTokenAndSetRole]);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchServices();
-    }, [fetchServices])
-  );
-
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
+    setCategoriesLoading(true);
     try {
       const token = await AsyncStorage.getItem('jwtToken');
       if (!token || !isTokenValid(token)) {
@@ -132,10 +193,115 @@ const Services = () => {
       }
     } catch (error) {
       console.error('Greška:', error);
+    } finally {
+      setCategoriesLoading(false);
+    }
+  }, []);
+
+  // Funkcija za preuzimanje podataka o selektovanoj kategoriji
+  const fetchCategoryData = async (categoryId) => {
+    try {
+      const token = await AsyncStorage.getItem('jwtToken');
+      if (!token || !isTokenValid(token)) {
+        console.error('Nema validnog tokena');
+        return;
+      }
+
+      const response = await fetch(
+        `https://klinikabackend-production.up.railway.app/api/ServiceCategory/${categoryId}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedCategory(data);
+      } else {
+        throw new Error('Greška prilikom preuzimanja podataka o kategoriji.');
+      }
+    } catch (err) {
+      console.error('Greška:', err.message);
+    }
+  };
+
+  // Funkcija za proveru postojanja usluge
+  const checkIfServiceExists = async (name) => {
+    try {
+      const token = await AsyncStorage.getItem('jwtToken');
+      if (!token || !isTokenValid(token)) {
+        return false;
+      }
+
+      const response = await fetch(
+        `https://klinikabackend-production.up.railway.app/api/Service/exists?name=${encodeURIComponent(name)}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Greška prilikom provere postojanja usluge.');
+      }
+
+      const exists = await response.json();
+      return exists;
+    } catch (err) {
+      console.error('Greška:', err.message);
+      return false;
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchServices();
+      fetchCategories();
+    }, [fetchServices, fetchCategories])
+  );
+
+  // Funkcija za otvaranje modala - učitaj kategorije kad se otvara
+  const handleOpenAddServiceModal = () => {
+    setShowModal(true);
+    if (categories.length === 0) {
+      fetchCategories();
     }
   };
 
   const handleAddService = async () => {
+    if (!newService.name || !newService.description || !newService.price || !newService.categoryId) {
+      Alert.alert('Greška', 'Molimo popunite sva polja i odaberite kategoriju.');
+      return;
+    }
+
+    // Validacija kao u React verziji
+    if (newService.name.length < 5) {
+      Alert.alert('Greška', 'Naziv usluge mora imati najmanje 5 karaktera.');
+      return;
+    }
+
+    if (newService.description.length < 5) {
+      Alert.alert('Greška', 'Opis usluge mora imati najmanje 5 karaktera.');
+      return;
+    }
+
+    if (parseFloat(newService.price) < 500) {
+      Alert.alert('Greška', 'Cena usluge mora biti najmanje 500.');
+      return;
+    }
+
+    // Proveri da li usluga već postoji
+    const serviceExists = await checkIfServiceExists(newService.name);
+    if (serviceExists) {
+      Alert.alert('Greška', 'Usluga sa tim imenom već postoji.');
+      return;
+    }
+
     const token = await AsyncStorage.getItem('jwtToken');
     if (!token || !isTokenValid(token)) {
       Alert.alert('Greška', 'Sesija je istekla. Molimo prijavite se ponovo.');
@@ -156,6 +322,7 @@ const Services = () => {
             price: parseFloat(newService.price),
             description: newService.description,
             categoryId: newService.categoryId,
+            category: selectedCategory,
           }),
         }
       );
@@ -168,6 +335,7 @@ const Services = () => {
           return;
         }
         const errorData = await response.json();
+        console.log('Error data:', errorData); // Debug log
         throw new Error(
           errorData?.errors
             ? Object.values(errorData.errors).flat().join(', ')
@@ -184,8 +352,10 @@ const Services = () => {
         price: '',
         categoryId: '',
       });
+      setSelectedCategory(null);
       Alert.alert('Uspeh', 'Usluga uspešno dodata!');
     } catch (err) {
+      console.log('Add service error:', err.message); // Debug log
       Alert.alert('Greška', `Error: ${err.message}`);
     }
   };
@@ -384,10 +554,6 @@ const Services = () => {
     }
   };
 
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
   const filteredAndSortedServices = services
     .filter((service) => {
       const searchTerm = searchQuery.toLowerCase();
@@ -420,12 +586,14 @@ const Services = () => {
             <TouchableOpacity
               style={styles.iconButton}
               onPress={() => handlePriceChangeClick(item.id)}
+              activeOpacity={0.7}
             >
               <Pencil size={18} color="#007AFF" />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconButton}
               onPress={() => handleDeleteClick(item.id)}
+              activeOpacity={0.7}
             >
               <Trash2 size={18} color="#FF3B30" />
             </TouchableOpacity>
@@ -440,12 +608,22 @@ const Services = () => {
         <TouchableOpacity
           style={styles.reserveButton}
           onPress={() => handleReserveClick(item)}
+          activeOpacity={0.8}
         >
           <Text style={styles.reserveButtonText}>Rezerviši termin</Text>
         </TouchableOpacity>
       )}
     </View>
   );
+
+  // Priprema opcija za sortiranje
+  const sortOptions = [
+    { label: 'Sortiraj po...', value: 'none' },
+    { label: 'Cena (rastuće)', value: 'priceAsc' },
+    { label: 'Cena (opadajuće)', value: 'priceDesc' },
+    { label: 'Naziv (A-Z)', value: 'nameAsc' },
+    { label: 'Naziv (Z-A)', value: 'nameDesc' }
+  ];
 
   if (loading) {
     return (
@@ -463,7 +641,7 @@ const Services = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Greška: {error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchServices}>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchServices} activeOpacity={0.8}>
             <Text style={styles.retryButtonText}>Pokušaj ponovo</Text>
           </TouchableOpacity>
         </View>
@@ -489,28 +667,21 @@ const Services = () => {
               />
             </View>
             
-            <View style={styles.sortContainer}>
-              <View style={styles.sortPickerWrapper}>
-                <Picker
-                  selectedValue={sortType}
-                  onValueChange={(itemValue) => setSortType(itemValue)}
-                  itemStyle={styles.pickerItem}
-                >
-                  <Picker.Item label="Sortiraj po..." value="none" />
-                  <Picker.Item label="Cena (rastuće)" value="priceAsc" />
-                  <Picker.Item label="Cena (opadajuće)" value="priceDesc" />
-                  <Picker.Item label="Naziv (A-Z)" value="nameAsc" />
-                  <Picker.Item label="Naziv (Z-A)" value="nameDesc" />
-                </Picker>
-              </View>
-            </View>
+            <CustomSelector
+              label="Sortiranje"
+              value={sortType}
+              options={sortOptions}
+              onValueChange={setSortType}
+              placeholder="Sortiraj po..."
+            />
           </View>
 
           {role === 'Admin' && (
             <View style={styles.adminButtonsContainer}>
               <TouchableOpacity
                 style={styles.addButton}
-                onPress={() => setShowModal(true)}
+                onPress={handleOpenAddServiceModal}
+                activeOpacity={0.8}
               >
                 <Text style={styles.addButtonText}>Dodaj novu uslugu</Text>
               </TouchableOpacity>
@@ -518,6 +689,7 @@ const Services = () => {
               <TouchableOpacity
                 style={[styles.addButton, styles.secondaryButton]}
                 onPress={() => setShowModal2(true)}
+                activeOpacity={0.8}
               >
                 <Text style={styles.addButtonText}>Dodaj novu kategoriju</Text>
               </TouchableOpacity>
@@ -566,7 +738,16 @@ const Services = () => {
                   <Text style={styles.modalTitle}>Dodaj novu uslugu</Text>
                   <TouchableOpacity 
                     style={styles.closeButton}
-                    onPress={() => setShowModal(false)}
+                    onPress={() => {
+                      setShowModal(false);
+                      setNewService({
+                        name: '',
+                        description: '',
+                        price: '',
+                        categoryId: '',
+                      });
+                    }}
+                    activeOpacity={0.7}
                   >
                     <X size={24} color="#6B7280" />
                   </TouchableOpacity>
@@ -618,29 +799,59 @@ const Services = () => {
                   
                   <View style={styles.inputContainer}>
                     <Text style={styles.inputLabel}>Kategorija</Text>
-                    <View style={styles.pickerContainer}>
-                      <Picker
-                        selectedValue={newService.categoryId}
-                        style={styles.modalPicker}
-                        onValueChange={(itemValue) => setNewService({ ...newService, categoryId: itemValue })}
-                        itemStyle={styles.pickerItem}
-                      >
-                        <Picker.Item label="Izaberite kategoriju" value="" />
-                        {categories.map((category) => (
-                          <Picker.Item key={category.id} label={category.name} value={category.id} />
-                        ))}
-                      </Picker>
-                    </View>
+                    {categoriesLoading ? (
+                      <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="small" color="#007AFF" />
+                        <Text style={styles.loadingText}>Učitavanje kategorija...</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.categoryPickerContainer}>
+                        <Picker
+                          selectedValue={newService.categoryId}
+                          onValueChange={(value) => {
+                            setNewService({ ...newService, categoryId: value });
+                            if (value) {
+                              fetchCategoryData(value);
+                            }
+                          }}
+                          style={styles.categoryPicker}
+                          itemStyle={styles.categoryPickerItem}
+                        >
+                          <Picker.Item label="Odaberite kategoriju" value="" />
+                          {categories.map((category) => (
+                            <Picker.Item
+                              key={category.id}
+                              label={category.name}
+                              value={category.id}
+                            />
+                          ))}
+                        </Picker>
+                      </View>
+                    )}
                   </View>
                 </ScrollView>
 
                 <View style={styles.modalButtons}>
-                  <TouchableOpacity style={styles.modalButton} onPress={handleAddService}>
+                  <TouchableOpacity 
+                    style={styles.modalButton} 
+                    onPress={handleAddService}
+                    activeOpacity={0.8}
+                  >
                     <Text style={styles.modalButtonText}>Dodaj uslugu</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={[styles.modalButton, styles.cancelButton]} 
-                    onPress={() => setShowModal(false)}
+                    onPress={() => {
+                      setShowModal(false);
+                      setNewService({
+                        name: '',
+                        description: '',
+                        price: '',
+                        categoryId: '',
+                      });
+                      setSelectedCategory(null);
+                    }}
+                    activeOpacity={0.8}
                   >
                     <Text style={styles.modalButtonText}>Otkaži</Text>
                   </TouchableOpacity>
@@ -669,7 +880,13 @@ const Services = () => {
                   <Text style={styles.modalTitle}>Dodaj novu kategoriju</Text>
                   <TouchableOpacity 
                     style={styles.closeButton}
-                    onPress={() => setShowModal2(false)}
+                    onPress={() => {
+                      setShowModal2(false);
+                      setName('');
+                      setDescription('');
+                      setErrorMessage('');
+                    }}
+                    activeOpacity={0.7}
                   >
                     <X size={24} color="#6B7280" />
                   </TouchableOpacity>
@@ -712,12 +929,22 @@ const Services = () => {
                 </ScrollView>
 
                 <View style={styles.modalButtons}>
-                  <TouchableOpacity style={styles.modalButton} onPress={handleAddCategory}>
+                  <TouchableOpacity 
+                    style={styles.modalButton} 
+                    onPress={handleAddCategory}
+                    activeOpacity={0.8}
+                  >
                     <Text style={styles.modalButtonText}>Dodaj kategoriju</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={[styles.modalButton, styles.cancelButton]} 
-                    onPress={() => setShowModal2(false)}
+                    onPress={() => {
+                      setShowModal2(false);
+                      setName('');
+                      setDescription('');
+                      setErrorMessage('');
+                    }}
+                    activeOpacity={0.8}
                   >
                     <Text style={styles.modalButtonText}>Otkaži</Text>
                   </TouchableOpacity>
@@ -743,12 +970,14 @@ const Services = () => {
               <TouchableOpacity 
                 style={[styles.modalButton, styles.deleteButton]} 
                 onPress={confirmDelete}
+                activeOpacity={0.8}
               >
                 <Text style={styles.modalButtonText}>Obriši</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]} 
                 onPress={cancelDelete}
+                activeOpacity={0.8}
               >
                 <Text style={styles.modalButtonText}>Otkaži</Text>
               </TouchableOpacity>
@@ -775,7 +1004,12 @@ const Services = () => {
                   <Text style={styles.modalTitle}>Ažuriraj cenu</Text>
                   <TouchableOpacity 
                     style={styles.closeButton}
-                    onPress={() => setShowPriceModal(false)}
+                    onPress={() => {
+                      setShowPriceModal(false);
+                      setNewPrice('');
+                      setSelectedServiceId(null);
+                    }}
+                    activeOpacity={0.7}
                   >
                     <X size={24} color="#6B7280" />
                   </TouchableOpacity>
@@ -795,12 +1029,21 @@ const Services = () => {
                 </View>
 
                 <View style={styles.modalButtons}>
-                  <TouchableOpacity style={styles.modalButton} onPress={handleUpdatePrice}>
+                  <TouchableOpacity 
+                    style={styles.modalButton} 
+                    onPress={handleUpdatePrice}
+                    activeOpacity={0.8}
+                  >
                     <Text style={styles.modalButtonText}>Sačuvaj</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={[styles.modalButton, styles.cancelButton]} 
-                    onPress={() => setShowPriceModal(false)}
+                    onPress={() => {
+                      setShowPriceModal(false);
+                      setNewPrice('');
+                      setSelectedServiceId(null);
+                    }}
+                    activeOpacity={0.8}
                   >
                     <Text style={styles.modalButtonText}>Otkaži</Text>
                   </TouchableOpacity>
@@ -836,6 +1079,7 @@ const styles = StyleSheet.create({
   },
   filtersSection: {
     marginBottom: 20,
+    gap: 16,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -843,7 +1087,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderRadius: 12,
     paddingHorizontal: 16,
-    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     height: 50,
@@ -856,27 +1099,84 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1E293B',
   },
-  sortContainer: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  // Custom Selector Styles
+  customSelectorContainer: {
+    position: 'relative',
+    zIndex: 1,
   },
-  sortPickerWrapper: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden',
-    minHeight: 60,
+  selectorLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 6,
   },
-  pickerItem: {
-    fontSize: 16,
-    color: '#1E293B',
-    backgroundColor: 'white',
-    height: 60,
+  selectorButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 44,
+  },
+  selectorButtonText: {
+    fontSize: 15,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  placeholderText: {
+    color: '#9CA3AF',
+  },
+  chevron: {
+    transition: 'transform 0.2s',
+  },
+  chevronUp: {
+    transform: [{ rotate: '180deg' }],
+  },
+  selectorDropdown: {
+    position: 'absolute',
+    top: 70,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 10,
+    marginTop: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 15,
+    zIndex: 10000,
+    maxHeight: 200,
+  },
+  selectorScrollView: {
+    maxHeight: 200,
+  },
+  selectorOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  selectorOptionSelected: {
+    backgroundColor: '#EBF8FF',
+  },
+  selectorOptionText: {
+    fontSize: 15,
+    color: '#374151',
+    flex: 1,
+  },
+  selectorOptionTextSelected: {
+    color: '#1D4ED8',
+    fontWeight: '500',
   },
   adminButtonsContainer: {
     gap: 12,
@@ -993,6 +1293,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
+    paddingVertical: 20,
   },
   loadingText: {
     marginTop: 16,
@@ -1025,7 +1326,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -1036,7 +1337,7 @@ const styles = StyleSheet.create({
     padding: 0,
     minWidth: '98%',
     maxWidth: 800,
-    maxHeight: '85%',
+    maxHeight: '80%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
@@ -1112,12 +1413,34 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: 'white',
     overflow: 'hidden',
+  },
+  picker: {
+    height: 52,
+    width: '100%',
+  },
+  pickerItem: {
+    fontSize: 17,
+    color: '#1E293B',
+  },
+  // Improved Category Picker Styles
+  categoryPickerContainer: {
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    borderRadius: 14,
+    backgroundColor: 'white',
+    overflow: 'hidden',
     minHeight: 52,
   },
-  modalPicker: {
+  categoryPicker: {
     height: 52,
+    width: '100%',
+    backgroundColor: 'white',
+  },
+  categoryPickerItem: {
+    fontSize: 18,
     color: '#1E293B',
-    fontSize: 16,
+    fontWeight: '500',
+    height: 52,
   },
   modalButtons: {
     flexDirection: 'row',
