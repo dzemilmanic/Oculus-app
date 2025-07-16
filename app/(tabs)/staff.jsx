@@ -55,15 +55,15 @@ const Staff = () => {
   const checkUserRole = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
-      console.log('Checking user role, token exists:', !!token);
+      //console.log('Checking user role, token exists:', !!token);
       
       if (token && token.trim() !== '' && isTokenValid(token)) {
         const userRole = getUserRoleFromToken(token);
-        console.log('User role from token:', userRole);
+        //console.log('User role from token:', userRole);
         setRole(userRole || 'User');
         setIsLoggedIn(true);
       } else {
-        console.log('No valid token found, setting as User');
+        //console.log('No valid token found, setting as User');
         setRole('User');
         setIsLoggedIn(false);
         if (token) {
@@ -71,7 +71,7 @@ const Staff = () => {
         }
       }
     } catch (error) {
-      console.error('Error checking user role:', error);
+      //console.error('Error checking user role:', error);
       setRole('User');
       setIsLoggedIn(false);
     }
@@ -129,16 +129,16 @@ const Staff = () => {
       const data = await response.json();
       setRequestStatus(data.status);
     } catch (err) {
-      console.error('Error fetching request status:', err);
+      //console.error('Error fetching request status:', err);
     }
   };
 
   const fetchRoleRequests = async () => {
-    console.log('=== FETCHING ROLE REQUESTS ===');
+    //console.log('=== FETCHING ROLE REQUESTS ===');
     setRequestsLoading(true);
     try {
       const token = await AsyncStorage.getItem('jwtToken');
-      console.log('Token exists:', !!token);
+      //console.log('Token exists:', !!token);
       
       if (!token) {
         Alert.alert('Greška', 'Niste prijavljeni. Molimo prijavite se ponovo.');
@@ -152,7 +152,7 @@ const Staff = () => {
         return;
       }
 
-      console.log('Making API request to fetch role requests...');
+      //console.log('Making API request to fetch role requests...');
       const response = await fetch(
         'https://klinikabackend-production.up.railway.app/api/RoleRequest/all',
         {
@@ -163,8 +163,8 @@ const Staff = () => {
         }
       );
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      //console.log('Response status:', response.status);
+      //console.log('Response ok:', response.ok);
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -177,20 +177,20 @@ const Staff = () => {
       }
 
       const data = await response.json();
-      console.log('=== API RESPONSE DATA ===');
-      console.log('Raw data:', data);
-      console.log('Data type:', typeof data);
-      console.log('Is array:', Array.isArray(data));
-      console.log('Data length:', data?.length);
+      //console.log('=== API RESPONSE DATA ===');
+      //console.log('Raw data:', data);
+      //console.log('Data type:', typeof data);
+      //console.log('Is array:', Array.isArray(data));
+      //console.log('Data length:', data?.length);
       
       if (Array.isArray(data) && data.length > 0) {
-        console.log('First request sample:', data[0]);
-        console.log('First request keys:', Object.keys(data[0]));
+        //console.log('First request sample:', data[0]);
+        //console.log('First request keys:', Object.keys(data[0]));
       }
 
       setRequests(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Error fetching role requests:', err);
+      //console.error('Error fetching role requests:', err);
       setError(err.message);
     } finally {
       setRequestsLoading(false);
@@ -198,7 +198,7 @@ const Staff = () => {
   };
 
   const handleRequestAction = async (requestId, action) => {
-    console.log(`Attempting to ${action} request ${requestId}`);
+    //console.log(`Attempting to ${action} request ${requestId}`);
     
     // Double check if user is still admin
     if (role !== 'Admin') {
@@ -223,7 +223,7 @@ const Staff = () => {
         }
       );
 
-      console.log(`${action} response status:`, response.status);
+      //console.log(`${action} response status:`, response.status);
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -241,7 +241,7 @@ const Staff = () => {
       );
       fetchRoleRequests(); // Refresh requests after action
     } catch (err) {
-      console.error(`Error ${action}ing request:`, err);
+      //console.error(`Error ${action}ing request:`, err);
       Alert.alert('Greška', 'Greška pri ažuriranju statusa zahteva: ' + err.message);
     }
   };
@@ -322,9 +322,9 @@ const Staff = () => {
       return;
     }
 
-    console.log('=== OPENING REQUESTS MODAL ===');
-    console.log('Current role:', role);
-    console.log('Is admin:', role === 'Admin');
+    //console.log('=== OPENING REQUESTS MODAL ===');
+    //console.log('Current role:', role);
+    //console.log('Is admin:', role === 'Admin');
     
     setShowRequests(true);
     fetchRoleRequests();
@@ -357,13 +357,13 @@ const Staff = () => {
   const isUser = isLoggedIn && role === 'User';
   const isAdmin = isLoggedIn && role === 'Admin';
 
-  console.log('=== RENDER STATE ===');
-  console.log('Role:', role);
-  console.log('Is Admin:', isAdmin);
-  console.log('Is User:', isUser);
-  console.log('Is Logged In:', isLoggedIn);
-  console.log('Show Requests:', showRequests);
-  console.log('Requests count:', requests.length);
+  //console.log('=== RENDER STATE ===');
+  //console.log('Role:', role);
+  //console.log('Is Admin:', isAdmin);
+  //console.log('Is User:', isUser);
+  //console.log('Is Logged In:', isLoggedIn);
+  //console.log('Show Requests:', showRequests);
+  //console.log('Requests count:', requests.length);
 
   return (
     <SafeAreaView style={styles.container}>

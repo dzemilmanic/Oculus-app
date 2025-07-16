@@ -71,20 +71,20 @@ export default function Home() {
   const checkUserRole = React.useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
-      console.log('Checking user role, token exists:', !!token);
+      //console.log('Checking user role, token exists:', !!token);
       
       if (token && isTokenValid(token)) {
         const role = getUserRoleFromToken(token);
-        console.log('User role from token:', role);
+        //console.log('User role from token:', role);
         setUserRole(role);
         setIsLoggedIn(true);
       } else {
-        console.log('No token found or invalid, setting as User');
+        //console.log('No token found or invalid, setting as User');
         setUserRole('');
         setIsLoggedIn(false);
       }
     } catch (error) {
-      console.error('Error checking user role:', error);
+      //console.error('Error checking user role:', error);
       setUserRole('');
       setIsLoggedIn(false);
     }
@@ -140,7 +140,7 @@ export default function Home() {
       const data = await response.json();
       setReviews(data);
     } catch (error) {
-      console.error(error.message);
+      //console.error(error.message);
     }
   };
 
@@ -177,7 +177,7 @@ export default function Home() {
       setReviews((prevReviews) => [...prevReviews, addedReview]);
       Alert.alert('Uspeh', 'Recenzija je uspešno dodata!');
     } catch (error) {
-      console.error('Greška prilikom dodavanja recenzije:', error);
+      //console.error('Greška prilikom dodavanja recenzije:', error);
       Alert.alert('Greška', 'Došlo je do greške prilikom povezivanja sa serverom.');
     }
   };
@@ -210,7 +210,7 @@ export default function Home() {
       );
       Alert.alert('Uspeh', 'Recenzija je uspešno obrisana!');
     } catch (error) {
-      console.error('Greška prilikom brisanja recenzije:', error);
+      //console.error('Greška prilikom brisanja recenzije:', error);
       Alert.alert('Greška', 'Došlo je do greške prilikom brisanja recenzije.');
     }
   };
@@ -622,13 +622,13 @@ const styles = StyleSheet.create({
     padding: 28,
     borderRadius: 20,
     alignItems: 'center',
-    shadowColor: '#667eea',
+    shadowColor: '#003366',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 6,
     borderTopWidth: 3,
-    borderTopColor: '#667eea',
+    borderTopColor: '#003366',
   },
   missionPointTitle: {
     fontSize: 20,
@@ -663,7 +663,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     padding: 24,
     borderRadius: 16,
-    shadowColor: '#667eea',
+    shadowColor: '#003366',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
@@ -838,7 +838,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   appointmentButton: {
-    backgroundColor: '#667eea',
+    backgroundColor: '#003366',
     paddingHorizontal: 28,
     paddingVertical: 14,
     borderRadius: 25,

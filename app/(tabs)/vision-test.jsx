@@ -254,7 +254,7 @@ export default function VisionTestScreen() {
         <ScrollView style={styles.container}>
           <View style={styles.welcomeSection}>
             <Text style={styles.welcomeTitle}>Ishihara test daltonizma</Text>
-            <Eye size={80} color="#007AFF" />
+            <Eye size={80} color="#003366" />
             <Text style={styles.welcomeDescription}>
               Profesionalni test za proveru sposobnosti razlikovanja boja. 
               Test koristi originalne Ishihara table koje se koriste u medicinskoj praksi.

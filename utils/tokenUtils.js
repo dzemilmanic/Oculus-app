@@ -38,7 +38,7 @@ const base64Decode = (str) => {
     
     return result;
   } catch (error) {
-    console.error('Base64 decode error:', error);
+    //console.error('Base64 decode error:', error);
     return null;
   }
 };
@@ -46,13 +46,13 @@ const base64Decode = (str) => {
 export const decodeJWTToken = (token) => {
   try {
     if (!token || typeof token !== 'string') {
-      console.log('Invalid token provided');
+      //console.log('Invalid token provided');
       return null;
     }
 
     const parts = token.split('.');
     if (parts.length !== 3) {
-      console.log('Invalid JWT token format');
+      //console.log('Invalid JWT token format');
       return null;
     }
 
@@ -60,16 +60,16 @@ export const decodeJWTToken = (token) => {
     const decodedPayload = base64Decode(payload);
     
     if (!decodedPayload) {
-      console.log('Failed to decode payload');
+      //console.log('Failed to decode payload');
       return null;
     }
     
     const parsedPayload = JSON.parse(decodedPayload);
     
-    console.log('Successfully decoded JWT token');
+    //console.log('Successfully decoded JWT token');
     return parsedPayload;
   } catch (error) {
-    console.error('Error decoding JWT token:', error);
+    //console.error('Error decoding JWT token:', error);
     return null;
   }
 };
@@ -99,7 +99,7 @@ export const getUserFromToken = async () => {
     const role = payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || 'User';
     return { role };
   } catch (error) {
-    console.error('Greška prilikom dekodiranja tokena:', error);
+    //console.error('Greška prilikom dekodiranja tokena:', error);
     return null;
   }
 };
@@ -111,7 +111,7 @@ export const isTokenValid = (token) => {
   // Check if token is expired
   const currentTime = Math.floor(Date.now() / 1000);
   if (payload.exp && payload.exp < currentTime) {
-    console.log('Token is expired');
+    //console.log('Token is expired');
     return false;
   }
   

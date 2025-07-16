@@ -66,7 +66,7 @@ const Login = () => {
           text: 'OK',
           onPress: () => {
             // Tab layout will automatically detect the change
-            console.log('Login successful, token saved');
+            //console.log('Login successful, token saved');
           }
         }
       ]);

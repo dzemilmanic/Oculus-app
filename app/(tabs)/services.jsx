@@ -135,7 +135,7 @@ const Services = () => {
       const roles = getUserRoleFromToken(token);
       setRole(roles);
     } catch (error) {
-      console.error('Greška prilikom čitanja tokena:', error);
+      //console.error('Greška prilikom čitanja tokena:', error);
       await AsyncStorage.removeItem('jwtToken');
       setRole('');
     }
@@ -192,7 +192,7 @@ const Services = () => {
         throw new Error('Greška prilikom učitavanja kategorija.');
       }
     } catch (error) {
-      console.error('Greška:', error);
+      //console.error('Greška:', error);
     } finally {
       setCategoriesLoading(false);
     }
@@ -203,7 +203,7 @@ const Services = () => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
       if (!token || !isTokenValid(token)) {
-        console.error('Nema validnog tokena');
+        //console.error('Nema validnog tokena');
         return;
       }
 
@@ -224,7 +224,7 @@ const Services = () => {
         throw new Error('Greška prilikom preuzimanja podataka o kategoriji.');
       }
     } catch (err) {
-      console.error('Greška:', err.message);
+      //console.error('Greška:', err.message);
     }
   };
 
@@ -253,7 +253,7 @@ const Services = () => {
       const exists = await response.json();
       return exists;
     } catch (err) {
-      console.error('Greška:', err.message);
+      //console.error('Greška:', err.message);
       return false;
     }
   };
@@ -335,7 +335,7 @@ const Services = () => {
           return;
         }
         const errorData = await response.json();
-        console.log('Error data:', errorData); // Debug log
+        //console.log('Error data:', errorData); // Debug log
         throw new Error(
           errorData?.errors
             ? Object.values(errorData.errors).flat().join(', ')
@@ -355,7 +355,7 @@ const Services = () => {
       setSelectedCategory(null);
       Alert.alert('Uspeh', 'Usluga uspešno dodata!');
     } catch (err) {
-      console.log('Add service error:', err.message); // Debug log
+      //console.log('Add service error:', err.message); // Debug log
       Alert.alert('Greška', `Error: ${err.message}`);
     }
   };
@@ -550,7 +550,7 @@ const Services = () => {
         Alert.alert('Greška', 'Greška prilikom dodavanja kategorije.');
       }
     } catch (error) {
-      console.error('Greška:', error);
+      //console.error('Greška:', error);
     }
   };
 

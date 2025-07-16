@@ -17,14 +17,14 @@ export default function TabLayout() {
       const token = await AsyncStorage.getItem('jwtToken');
       const loggedIn = token && token.trim() !== '' && isTokenValid(token);
       
-      console.log('Auth check - Token exists:', loggedIn);
+      //console.log('Auth check - Token exists:', loggedIn);
       setIsLoggedIn(loggedIn);
       
       // Check if user is admin
       if (loggedIn && token) {
         const userRole = getUserRoleFromToken(token);
         const adminStatus = userRole === 'Admin';
-        console.log('User role:', userRole, 'Is admin:', adminStatus);
+        //console.log('User role:', userRole, 'Is admin:', adminStatus);
         setIsAdmin(adminStatus);
       } else {
         setIsAdmin(false);
@@ -32,11 +32,11 @@ export default function TabLayout() {
       
       // If token is invalid, remove it
       if (token && !loggedIn) {
-        console.log('Removing invalid token');
+        //console.log('Removing invalid token');
         await AsyncStorage.removeItem('jwtToken');
       }
     } catch (error) {
-      console.error('Error checking auth status:', error);
+      //console.error('Error checking auth status:', error);
       setIsLoggedIn(false);
       setIsAdmin(false);
     } finally {
@@ -115,6 +115,7 @@ export default function TabLayout() {
           tabBarIcon: ({ size, color }) => (
             <Ionicons name="help-circle" size={size} color={color} />
           ),
+           href: isLoggedIn && isAdmin ? null : undefined,
         }}
       />
       <Tabs.Screen

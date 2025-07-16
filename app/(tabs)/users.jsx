@@ -54,7 +54,7 @@ const Users = () => {
       
       return userRole === 'Admin';
     } catch (error) {
-      console.error('Error checking admin access:', error);
+      //console.error('Error checking admin access:', error);
       setRole('');
       return false;
     }

@@ -119,7 +119,7 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
         setUserHasReview(false);
       }
     } catch (error) {
-      console.error('Greška pri proveri statusa korisnika:', error);
+      //console.error('Greška pri proveri statusa korisnika:', error);
       setUserHasReview(false);
     }
   };

@@ -88,20 +88,20 @@ const News = () => {
   const checkUserRole = React.useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
-      console.log('Checking user role, token exists:', !!token);
+      //console.log('Checking user role, token exists:', !!token);
       
       if (token && token.trim() !== '') {
         const role = getUserRoleFromToken(token);
-        console.log('User role from token:', role);
+        //console.log('User role from token:', role);
         setUserRole(role || 'User');
         setIsLoggedIn(true);
       } else {
-        console.log('No token found, setting as User');
+        //console.log('No token found, setting as User');
         setUserRole('User');
         setIsLoggedIn(false);
       }
     } catch (error) {
-      console.error('Error checking user role:', error);
+      //console.error('Error checking user role:', error);
       setUserRole('User');
       setIsLoggedIn(false);
     }
@@ -320,7 +320,7 @@ const News = () => {
   }
 
   const isAdmin = isLoggedIn && userRole === 'Admin';
-  console.log('Render - isLoggedIn:', isLoggedIn, 'userRole:', userRole, 'isAdmin:', isAdmin);
+  //console.log('Render - isLoggedIn:', isLoggedIn, 'userRole:', userRole, 'isAdmin:', isAdmin);
 
   return (
     <SafeAreaView style={styles.container}>

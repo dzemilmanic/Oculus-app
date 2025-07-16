@@ -120,14 +120,14 @@ const AppointmentModal = ({ isOpen, onClose, service }) => {
             return;
           }
         } catch (err) {
-          console.error(`Error checking availability for time ${time}:`, err);
+          //console.error(`Error checking availability for time ${time}:`, err);
         }
       }
 
       setAvailableTimes(availableSlots);
     } catch (err) {
       setError('Greška prilikom provere dostupnih termina');
-      console.error(err);
+      //console.error(err);
     } finally {
       setLoading(false);
     }
@@ -214,7 +214,7 @@ const AppointmentModal = ({ isOpen, onClose, service }) => {
       setError('');
     } catch (err) {
       setError(err.message || 'Greška prilikom zakazivanja termina');
-      console.error(err);
+      //console.error(err);
     }
   };
 

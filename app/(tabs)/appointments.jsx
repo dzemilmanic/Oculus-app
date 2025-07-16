@@ -113,7 +113,7 @@ const Appointments = () => {
         );
 
         if (!response.ok) {
-          console.error(`Failed to cancel appointment ${appointment.id}`);
+          //console.error(`Failed to cancel appointment ${appointment.id}`);
           continue;
         }
 
@@ -124,7 +124,7 @@ const Appointments = () => {
           )
         );
       } catch (err) {
-        console.error(`Error canceling appointment ${appointment.id}:`, err);
+        //console.error(`Error canceling appointment ${appointment.id}:`, err);
       }
     }
 

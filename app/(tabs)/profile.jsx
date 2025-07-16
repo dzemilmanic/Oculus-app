@@ -92,7 +92,7 @@ const Profile = () => {
           profileImagePath: data.profileImagePath || '',
         });
       } else {
-        console.error('Greška prilikom učitavanja podataka o korisniku');
+        //console.error('Greška prilikom učitavanja podataka o korisniku');
         if (response.status === 401) {
           await AsyncStorage.removeItem('jwtToken');
           setIsLoggedIn(false);
@@ -109,7 +109,7 @@ const Profile = () => {
         setDoctorId('');
       }
     } catch (error) {
-      console.error('Greška prilikom poziva API-ja:', error);
+      //console.error('Greška prilikom poziva API-ja:', error);
       // Resetuj state ako je greška
       setUser({
         ime: '',
@@ -166,14 +166,14 @@ const Profile = () => {
           const data = await response.json();
           setAppointments(data);
         } else {
-          console.error('Greška prilikom dohvatanja termina.');
+          //console.error('Greška prilikom dohvatanja termina.');
           if (response.status === 401) {
             await AsyncStorage.removeItem('jwtToken');
             setIsLoggedIn(false);
           }
         }
       } catch (error) {
-        console.error('Greška prilikom poziva API-ja:', error);
+        //console.error('Greška prilikom poziva API-ja:', error);
       }
     }
   };
@@ -302,7 +302,7 @@ const Profile = () => {
         }
       }
     } catch (error) {
-      console.error('Greška:', error);
+      //console.error('Greška:', error);
       setErrorMessage('Došlo je do greške. Pokušajte ponovo.');
     } finally {
       setLoading(false);
@@ -345,9 +345,9 @@ const Profile = () => {
               setDoctorId('');
               setAppointments([]);
               setIsLoggedIn(false);
-              console.log('User logged out');
+              //console.log('User logged out');
             } catch (error) {
-              console.error('Error during logout:', error);
+              //console.error('Error during logout:', error);
             }
           },
         },
