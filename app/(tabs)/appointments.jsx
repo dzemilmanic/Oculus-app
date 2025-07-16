@@ -8,10 +8,74 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Dimensions,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import { UserPlus } from 'lucide-react-native';
+import { UserPlus, ChevronDown } from 'lucide-react-native';
 import ApproveAppointmentModal from '@/components/ApproveAppointmentModal';
+
+const { height: screenHeight } = Dimensions.get('window');
+
+const CustomSelector = ({ label, value, options, onValueChange, placeholder = "Odaberite opciju" }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const selectedOption = options.find(opt => opt.value === value);
+  
+  return (
+    <View style={styles.customSelectorContainer}>
+      <Text style={styles.selectorLabel}>{label}</Text>
+      <TouchableOpacity
+        style={styles.selectorButton}
+        onPress={() => setIsOpen(!isOpen)}
+        activeOpacity={0.7}
+      >
+        <Text style={[
+          styles.selectorButtonText,
+          !selectedOption && styles.placeholderText
+        ]}>
+          {selectedOption?.label || placeholder}
+        </Text>
+        <ChevronDown 
+          size={16} 
+          color="#6B7280"
+          style={[styles.chevron, isOpen && styles.chevronUp]}
+        />
+      </TouchableOpacity>
+      
+      {isOpen && (
+        <View style={styles.selectorDropdown}>
+          <ScrollView 
+            style={styles.selectorScrollView}
+            showsVerticalScrollIndicator={true}
+            nestedScrollEnabled={true}
+            keyboardShouldPersistTaps="handled"
+          >
+            {options.map((option) => (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.selectorOption,
+                  value === option.value && styles.selectorOptionSelected
+                ]}
+                onPress={() => {
+                  onValueChange(option.value);
+                  setIsOpen(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={[
+                  styles.selectorOptionText,
+                  value === option.value && styles.selectorOptionTextSelected
+                ]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </View>
+  );
+};
 
 const Appointments = () => {
   const [appointments, setAppointments] = useState([]);
@@ -212,7 +276,7 @@ const Appointments = () => {
       setFilteredAppointments(appointments);
     } else {
       const filtered = appointments.filter(
-        (appointment) => appointment.status === parseInt(selectedStatus)
+        (appointment) => appointment.status === selectedStatus
       );
       setFilteredAppointments(filtered);
     }
@@ -242,6 +306,15 @@ const Appointments = () => {
     3: 'Otkazan',
   };
 
+  // Priprema opcija za status filter
+  const statusOptions = [
+    { label: 'Svi termini', value: '' },
+    { label: 'Za dodelu lekara', value: 0 },
+    { label: 'Odobren', value: 1 },
+    { label: 'Završen', value: 2 },
+    { label: 'Otkazan', value: 3 }
+  ];
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -264,25 +337,20 @@ const Appointments = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Termini</Text>
-      
-      <View style={styles.filterContainer}>
-        <Text style={styles.filterLabel}>Prikaži po statusu:</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={statusFilter}
+      <View style={styles.headerSection}>
+        <Text style={styles.title}>Termini</Text>
+        
+        <View style={styles.filtersSection}>
+          <CustomSelector
+            label="Filtriraj po statusu"
+            value={statusFilter}
+            options={statusOptions}
             onValueChange={handleStatusChange}
-            style={styles.picker}
-          >
-            <Picker.Item label="Svi" value="" />
-            <Picker.Item label="Za dodelu lekara" value="0" />
-            <Picker.Item label="Odobren" value="1" />
-            <Picker.Item label="Završen" value="2" />
-            <Picker.Item label="Otkazan" value="3" />
-          </Picker>
+            placeholder="Svi termini"
+          />
         </View>
       </View>
-
+      
       <ScrollView
         style={styles.scrollView}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -339,97 +407,168 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  headerSection: {
+    backgroundColor: 'white',
+    paddingHorizontal: 20,
     paddingTop: 60,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
   },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#1E293B',
     textAlign: 'center',
     marginBottom: 24,
-    color: '#1E293B',
-    paddingHorizontal: 20,
   },
-  filterContainer: {
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+  filtersSection: {
+    marginBottom: 4,
   },
-  filterLabel: {
-    fontSize: 16,
+  // Custom Selector Styles
+  customSelectorContainer: {
+    position: 'relative',
+    zIndex: 1,
+  },
+  selectorLabel: {
+    fontSize: 14,
     fontWeight: '500',
     color: '#374151',
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  pickerContainer: {
+  selectorButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    backgroundColor: 'white',
+    borderColor: '#D1D5DB',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 44,
   },
-  picker: {
-    height: 50,
+  selectorButtonText: {
+    fontSize: 15,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  placeholderText: {
+    color: '#9CA3AF',
+  },
+  chevron: {
+    transition: 'transform 0.2s',
+  },
+  chevronUp: {
+    transform: [{ rotate: '180deg' }],
+  },
+  selectorDropdown: {
+    position: 'absolute',
+    top: 70,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 10,
+    marginTop: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 15,
+    zIndex: 10000,
+    maxHeight: 200,
+  },
+  selectorScrollView: {
+    maxHeight: 200,
+  },
+  selectorOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  selectorOptionSelected: {
+    backgroundColor: '#EBF8FF',
+  },
+  selectorOptionText: {
+    fontSize: 15,
+    color: '#374151',
+    flex: 1,
+  },
+  selectorOptionTextSelected: {
+    color: '#1D4ED8',
+    fontWeight: '500',
   },
   scrollView: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
+    paddingTop: 20,
   },
   card: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#007AFF',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   cardText: {
-    fontSize: 14,
-    color: '#374151',
-    marginBottom: 4,
+    fontSize: 15,
+    color: '#64748B',
+    marginBottom: 8,
+    lineHeight: 22,
   },
   boldText: {
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#1E293B',
   },
   statusBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-    marginTop: 8,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 12,
     marginBottom: 12,
   },
   statusText: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '600',
   },
   assignButton: {
     backgroundColor: '#007AFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginTop: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginTop: 12,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   assignButtonText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
   },
   loadingContainer: {

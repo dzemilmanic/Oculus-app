@@ -11,11 +11,13 @@ import {
   Linking,
   SafeAreaView,
   Dimensions,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import { Clock, MapPin, Phone, Heart, Users, Calendar, CircleCheck as CheckCircle2 } from 'lucide-react-native';
+import { Clock, MapPin, Phone, Heart, Users, Calendar, CircleCheck as CheckCircle2, Info, X } from 'lucide-react-native';
 import ImageSlider from '@/components/Home/ImageSlider';
 import ReviewSection from '@/components/Home/ReviewSection';
 import { getUserRoleFromToken, isTokenValid } from '@/utils/tokenUtils';
@@ -31,6 +33,8 @@ export default function Home() {
   const [userRole, setUserRole] = useState('');
   const [showSplash, setShowSplash] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [selectedServiceInfo, setSelectedServiceInfo] = useState(null);
 
   const slides = [
     {
@@ -317,6 +321,16 @@ export default function Home() {
                 <View key={index} style={styles.serviceCard}>
                   <CheckCircle2 size={24} color="#34C759" />
                   <Text style={styles.serviceText}>{service.name}</Text>
+                  <TouchableOpacity
+                    style={styles.infoButton}
+                    onPress={() => {
+                      setSelectedServiceInfo(service);
+                      setShowInfoModal(true);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Info size={16} color="#007AFF" />
+                  </TouchableOpacity>
                 </View>
               ))}
             </View>
@@ -389,6 +403,49 @@ export default function Home() {
           isLoggedIn={isLoggedIn}
         />
       </ScrollView>
+
+      {/* Service Info Modal */}
+      <Modal
+        visible={showInfoModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowInfoModal(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowInfoModal(false)}>
+          <View style={styles.infoModalOverlay}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.infoModalContent}>
+                <View style={styles.infoModalHeader}>
+                  <Text style={styles.infoModalTitle}>
+                    {selectedServiceInfo?.name}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.infoModalCloseButton}
+                    onPress={() => setShowInfoModal(false)}
+                    activeOpacity={0.7}
+                  >
+                    <X size={20} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView 
+                  style={styles.infoModalScrollView}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <Text style={styles.infoModalDescription}>
+                    {selectedServiceInfo?.description}
+                  </Text>
+                  <View style={styles.infoModalPriceContainer}>
+                    <Text style={styles.infoModalPriceLabel}>Cena:</Text>
+                    <Text style={styles.infoModalPrice}>
+                      {selectedServiceInfo?.price} RSD
+                    </Text>
+                  </View>
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -546,6 +603,92 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#1a1a1a',
     flex: 1,
+  },
+  infoButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F0F9FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
+  // Info Modal Styles
+  infoModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  infoModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '70%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  infoModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    backgroundColor: '#F8FAFC',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  infoModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    flex: 1,
+    marginRight: 12,
+  },
+  infoModalCloseButton: {
+    padding: 4,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+  },
+  infoModalScrollView: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    maxHeight: 300,
+  },
+  infoModalDescription: {
+    fontSize: 16,
+    color: '#374151',
+    lineHeight: 24,
+    marginBottom: 20,
+  },
+  infoModalPriceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  infoModalPriceLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1E40AF',
+    marginRight: 8,
+  },
+  infoModalPrice: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E40AF',
   },
   workingHoursContainer: {
     gap: 16,

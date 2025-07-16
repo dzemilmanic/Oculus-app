@@ -6,13 +6,12 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  SafeAreaView,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from 'react-native';
-import { Eye, EyeOff } from 'lucide-react-native';
+import { Eye, EyeOff, LogIn, Shield } from 'lucide-react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -120,231 +119,286 @@ const Login = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardAvoidingView}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.loginContainer}>
-            <Text style={styles.title}>Prijavi se</Text>
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.loginContainer}>
+          <View style={styles.iconContainer}>
+            <View style={styles.iconBackground}>
+              <LogIn size={32} color="#3e48d6ff" />
+            </View>
+          </View>
+          <Text style={styles.loginTitle}>Prijavi se</Text>
+          <Text style={styles.loginSubtitle}>Unesite vaše podatke za pristup aplikaciji</Text>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Email</Text>
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="Unesite vaš email"
+              placeholderTextColor="#94a3b8"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {email && (
+              <View style={styles.forgotPasswordContainer}>
+                <TouchableOpacity
+                  onPress={handleForgotPassword}
+                  disabled={isLoading || isResetLinkSent}
+                  style={styles.forgotPasswordButton}
+                >
+                  <Text
+                    style={[
+                      styles.forgotPasswordText,
+                      isResetLinkSent && styles.linkDisabled,
+                    ]}
+                  >
+                    {isResetLinkSent ? 'Link poslat' : 'Zaboravljena lozinka?'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Lozinka</Text>
+            <View style={styles.passwordContainer}>
               <TextInput
-                style={styles.input}
-                value={email}
-                onChangeText={setEmail}
-                placeholder="Unesite vaš email"
-                keyboardType="email-address"
+                style={[styles.input, styles.passwordInput]}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Unesite vašu lozinku"
+                placeholderTextColor="#94a3b8"
+                secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoCorrect={false}
               />
-              {email && (
-                <View style={styles.forgotPasswordContainer}>
-                  <TouchableOpacity
-                    onPress={handleForgotPassword}
-                    disabled={isLoading || isResetLinkSent}
-                    style={styles.forgotPasswordButton}
-                  >
-                    <Text
-                      style={[
-                        styles.forgotPasswordText,
-                        isResetLinkSent && styles.linkDisabled,
-                      ]}
-                    >
-                      {isResetLinkSent ? 'Link poslat' : 'Zaboravljena lozinka?'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Lozinka</Text>
-              <View style={styles.passwordContainer}>
-                <TextInput
-                  style={[styles.input, styles.passwordInput]}
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="Unesite vašu lozinku"
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <TouchableOpacity
-                  style={styles.passwordToggle}
-                  onPress={togglePasswordVisibility}
-                >
-                  {showPassword ? (
-                    <EyeOff size={20} color="#666" />
-                  ) : (
-                    <Eye size={20} color="#666" />
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.loginButton, isLoading && styles.buttonDisabled]}
-              onPress={handleSubmit}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.loginButtonText}>Prijavi se</Text>
-              )}
-            </TouchableOpacity>
-
-            {error && <Text style={styles.errorMessage}>{error}</Text>}
-            {successMessage && <Text style={styles.successMessage}>{successMessage}</Text>}
-
-            <View style={styles.registerContainer}>
-              <Text style={styles.registerText}>Nemate registrovan nalog? </Text>
-              <TouchableOpacity onPress={handleRegisterPress}>
-                <Text style={styles.registerLink}>Registrujte se</Text>
+              <TouchableOpacity
+                style={styles.passwordToggle}
+                onPress={togglePasswordVisibility}
+              >
+                {showPassword ? (
+                  <EyeOff size={20} color="#64748b" />
+                ) : (
+                  <Eye size={20} color="#64748b" />
+                )}
               </TouchableOpacity>
             </View>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+
+          <TouchableOpacity
+            style={[styles.loginButton, isLoading && styles.buttonDisabled]}
+            onPress={handleSubmit}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.loginButtonText}>Prijavi se</Text>
+            )}
+          </TouchableOpacity>
+
+          {error && <Text style={styles.errorMessage}>{error}</Text>}
+          {successMessage && <Text style={styles.successMessage}>{successMessage}</Text>}
+
+          <View style={styles.registerContainer}>
+            <Text style={styles.registerText}>
+              Nemate registrovan nalog?{' '}
+              <TouchableOpacity onPress={handleRegisterPress}>
+                <Text style={styles.registerLink}>Registrujte se</Text>
+              </TouchableOpacity>
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
   },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  scrollContent: {
+  scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 20,
+    padding: 16,
   },
   loginContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
     padding: 32,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
+    marginHorizontal: 16,
+    shadowColor: '#667eea',
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 32,
+    elevation: 12,
+    borderTopWidth: 4,
+    borderTopColor: '#667eea',
+  },
+  iconContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  iconBackground: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#667eea',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
     elevation: 8,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '600',
-    color: '#1C1C1E',
+  loginTitle: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#1a202c',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 8,
+  },
+  loginSubtitle: {
+    fontSize: 16,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 22,
   },
   formGroup: {
     marginBottom: 20,
   },
   label: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#1C1C1E',
+    fontWeight: '600',
+    color: '#374151',
     marginBottom: 8,
   },
   input: {
+    width: '100%',
+    padding: 16,
     borderWidth: 2,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
     fontSize: 16,
-    color: '#1C1C1E',
-    backgroundColor: '#FFFFFF',
+    color: '#1f2937',
+    backgroundColor: '#ffffff',
+    shadowColor: '#667eea',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   passwordContainer: {
     position: 'relative',
   },
   passwordInput: {
-    paddingRight: 50,
+    paddingRight: 56,
   },
   passwordToggle: {
     position: 'absolute',
-    right: 12,
-    top: 12,
-    padding: 4,
+    right: 16,
+    top: 16,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f8fafc',
   },
   forgotPasswordContainer: {
     alignItems: 'flex-end',
-    marginTop: 6,
+    marginTop: 8,
   },
   forgotPasswordButton: {
     padding: 4,
   },
   forgotPasswordText: {
-    color: '#007AFF',
-    fontSize: 13,
-    fontWeight: '500',
+    color: '#667eea',
+    fontSize: 14,
+    fontWeight: '600',
   },
   linkDisabled: {
-    color: '#10B981',
+    color: '#10b981',
   },
   loginButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    paddingVertical: 14,
+    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    borderRadius: 16,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
+    marginTop: 16,
+    shadowColor: '#667eea',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    backgroundColor: '#cbd5e1',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   loginButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   errorMessage: {
-    color: '#FF3B30',
+    color: '#ef4444',
     fontSize: 14,
     textAlign: 'center',
     marginTop: 16,
-    padding: 12,
-    backgroundColor: '#FEE2E2',
-    borderRadius: 8,
+    padding: 16,
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ef4444',
+    fontWeight: '500',
   },
   successMessage: {
-    color: '#10B981',
+    color: '#10b981',
     fontSize: 14,
     textAlign: 'center',
     marginTop: 16,
-    padding: 12,
-    backgroundColor: '#D1FAE5',
-    borderRadius: 8,
+    padding: 16,
+    backgroundColor: '#ecfdf5',
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#10b981',
+    fontWeight: '500',
   },
   registerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    marginTop: 24,
     alignItems: 'center',
-    marginTop: 20,
   },
   registerText: {
-    fontSize: 14,
-    color: '#1C1C1E',
+    fontSize: 15,
+    color: '#6b7280',
+    fontWeight: '500',
   },
   registerLink: {
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '500',
+    color: '#667eea',
+    fontWeight: '700',
   },
 });
 

@@ -85,7 +85,7 @@ export default function TabLayout() {
           backgroundColor: '#ffffff',
           borderTopWidth: 1,
           borderTopColor: '#E5E5E7',
-          height: 60,
+          height: 80,
           paddingBottom: 8,
           paddingTop: 8,
         },
@@ -105,6 +105,15 @@ export default function TabLayout() {
           title: 'Usluge',
           tabBarIcon: ({ size, color }) => (
             <Ionicons name="medical" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="vision-test"
+        options={{
+          title: 'Test',
+          tabBarIcon: ({ size, color }) => (
+            <Ionicons name="help-circle" size={size} color={color} />
           ),
         }}
       />

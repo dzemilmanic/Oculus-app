@@ -171,7 +171,7 @@ const Services = () => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
       if (!token || !isTokenValid(token)) {
-        console.error('Nema validnog tokena');
+        
         return;
       }
 
