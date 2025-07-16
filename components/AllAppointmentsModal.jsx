@@ -11,10 +11,59 @@ import {
   Alert,
   FlatList,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import { ArrowUpDown, Clock, X, FileText } from 'lucide-react-native';
+import { ArrowUpDown, Clock, X, FileText, ChevronDown } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isTokenValid } from '@/utils/tokenUtils';
+
+const CustomSelector = ({ label, value, options, onValueChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const selectedOption = options.find(opt => opt.value === value);
+  
+  return (
+    <View style={styles.customSelectorContainer}>
+      <Text style={styles.selectorLabel}>{label}</Text>
+      <TouchableOpacity
+        style={styles.selectorButton}
+        onPress={() => setIsOpen(!isOpen)}
+      >
+        <Text style={styles.selectorButtonText}>
+          {selectedOption?.label || 'Odaberite'}
+        </Text>
+        <ChevronDown 
+          size={16} 
+          color="#6B7280"
+          style={[styles.chevron, isOpen && styles.chevronUp]}
+        />
+      </TouchableOpacity>
+      
+      {isOpen && (
+        <View style={styles.selectorDropdown}>
+          {options.map((option) => (
+            <TouchableOpacity
+              key={option.value}
+              style={[
+                styles.selectorOption,
+                value === option.value && styles.selectorOptionSelected
+              ]}
+              onPress={() => {
+                onValueChange(option.value);
+                setIsOpen(false);
+              }}
+            >
+              <Text style={[
+                styles.selectorOptionText,
+                value === option.value && styles.selectorOptionTextSelected
+              ]}>
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
 
 const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
   const [isAddNotesModalOpen, setIsAddNotesModalOpen] = useState(false);
@@ -198,6 +247,38 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
     return appDate < now;
   };
 
+  const sortOptions = [
+    { label: 'Najskoriji prvo', value: 'nearest' },
+    { label: 'Najdalji prvo', value: 'furthest' }
+  ];
+
+  const timeFilterOptions = [
+    { label: 'Svi termini', value: 'all' },
+    { label: 'Prošli termini', value: 'past' },
+    { label: 'Budući termini', value: 'upcoming' }
+  ];
+
+  const getStatusOptions = () => {
+    const baseOptions = [{ label: 'Svi statusi', value: 'all' }];
+    
+    if (userRole === 'User') {
+      return [
+        ...baseOptions,
+        { label: 'Čeka se odobrenje', value: '0' },
+        { label: 'Odobren', value: '1' },
+        { label: 'Otkazan', value: '3' }
+      ];
+    } else {
+      return [
+        ...baseOptions,
+        { label: 'Čeka se odobrenje', value: '0' },
+        { label: 'Odobren', value: '1' },
+        { label: 'Završen', value: '2' },
+        { label: 'Otkazan', value: '3' }
+      ];
+    }
+  };
+
   const renderAppointmentItem = ({ item }) => {
     const date = new Date(item.appointmentDate);
     const formattedDate = date.toLocaleDateString('sr-RS', {
@@ -224,9 +305,10 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
           </View>
         </View>
         
-        <Text style={styles.appointmentTime}>
-          <Clock size={16} color="#64748B" /> {formattedTime}
-        </Text>
+        <View style={styles.timeContainer}>
+          <Clock size={16} color="#64748B" />
+          <Text style={styles.appointmentTime}>{formattedTime}</Text>
+        </View>
         
         <Text style={styles.serviceName}>{item.serviceName}</Text>
         
@@ -276,54 +358,34 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
           </View>
 
           <View style={styles.filterSection}>
-            <View style={styles.filterRow}>
-              <Text style={styles.filterLabel}>Sortiraj:</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={filters.sortBy}
-                  onValueChange={(value) => handleFilterChange('sortBy', value)}
-                  style={styles.picker}
-                >
-                  <Picker.Item label="Najskoriji prvo" value="nearest" />
-                  <Picker.Item label="Najdalji prvo" value="furthest" />
-                </Picker>
-              </View>
+            <View style={styles.filterHeader}>
+              <ArrowUpDown size={20} color="#374151" />
+              <Text style={styles.filterSectionTitle}>Filteri i sortiranje</Text>
             </View>
-
-            {userRole && userRole.includes('Doctor') && (
-              <View style={styles.filterRow}>
-                <Text style={styles.filterLabel}>Vreme:</Text>
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={filters.timeFilter}
-                    onValueChange={(value) => handleFilterChange('timeFilter', value)}
-                    style={styles.picker}
-                  >
-                    <Picker.Item label="Svi termini" value="all" />
-                    <Picker.Item label="Prošli termini" value="past" />
-                    <Picker.Item label="Budući termini" value="upcoming" />
-                  </Picker>
-                </View>
-              </View>
-            )}
-
-            <View style={styles.filterRow}>
-              <Text style={styles.filterLabel}>Status:</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={filters.status}
-                  onValueChange={(value) => handleFilterChange('status', value)}
-                  style={styles.picker}
-                >
-                  <Picker.Item label="Svi statusi" value="all" />
-                  {userRole === 'User' && (
-                    <Picker.Item label="Čeka se odobrenje" value="0" />
-                  )}
-                  <Picker.Item label="Odobren" value="1" />
-                  {userRole === 'User' && <Picker.Item label="Otkazan" value="3" />}
-                  {userRole !== 'User' && <Picker.Item label="Završen" value="2" />}
-                </Picker>
-              </View>
+            
+            <View style={styles.filtersGrid}>
+              <CustomSelector
+                label="Sortiranje"
+                value={filters.sortBy}
+                options={sortOptions}
+                onValueChange={(value) => handleFilterChange('sortBy', value)}
+              />
+              
+              <CustomSelector
+                label="Status"
+                value={filters.status}
+                options={getStatusOptions()}
+                onValueChange={(value) => handleFilterChange('status', value)}
+              />
+              
+              {userRole && userRole.includes('Doctor') && (
+                <CustomSelector
+                  label="Vreme"
+                  value={filters.timeFilter}
+                  options={timeFilterOptions}
+                  onValueChange={(value) => handleFilterChange('timeFilter', value)}
+                />
+              )}
             </View>
           </View>
 
@@ -337,7 +399,7 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
             />
           ) : (
             <View style={styles.noAppointmentsContainer}>
-              <Text style={styles.noAppointmentsText}>Nemate zakazane termine.</Text>
+              <Text style={styles.noAppointmentsText}>Nemate zakazane termine sa ovim filterima.</Text>
             </View>
           )}
 
@@ -398,6 +460,7 @@ const AllAppointmentsModal = ({ isOpen, onClose, appointments, userRole }) => {
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
@@ -407,7 +470,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     width: '100%',
     maxWidth: 500,
-    minHeight: '70%',
+    minHeight: '80%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
@@ -436,31 +499,89 @@ const styles = StyleSheet.create({
   filterSection: {
     backgroundColor: '#F8FAFC',
     paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
   },
-  filterRow: {
+  filterHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
+    gap: 8,
   },
-  filterLabel: {
-    fontSize: 14,
+  filterSectionTitle: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#374151',
-    width: 80,
   },
-  pickerContainer: {
-    flex: 1,
+  filtersGrid: {
+    gap: 12,
+  },
+  customSelectorContainer: {
+    position: 'relative',
+  },
+  selectorLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 6,
+  },
+  selectorButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
-    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#D1D5DB',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 44,
   },
-  picker: {
-    height: 40,
-    color: '#1E293B',
+  selectorButtonText: {
+    fontSize: 15,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  chevron: {
+    transition: 'transform 0.2s',
+  },
+  chevronUp: {
+    transform: [{ rotate: '180deg' }],
+  },
+  selectorDropdown: {
+    position: 'absolute',
+    top: 44,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 10,
+    marginTop: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 10,
+    zIndex: 9999,
+  },
+  selectorOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  selectorOptionSelected: {
+    backgroundColor: '#EBF8FF',
+  },
+  selectorOptionText: {
+    fontSize: 15,
+    color: '#374151',
+  },
+  selectorOptionTextSelected: {
+    color: '#1D4ED8',
+    fontWeight: '500',
   },
   appointmentsList: {
     flex: 1,
@@ -510,12 +631,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#FFFFFF',
   },
+  timeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
   appointmentTime: {
     fontSize: 14,
     color: '#64748B',
-    marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   serviceName: {
     fontSize: 16,

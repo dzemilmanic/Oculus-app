@@ -9,8 +9,57 @@ import {
   TextInput,
   FlatList,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import { ArrowUpDown, Search, X, FileText, User, Calendar } from 'lucide-react-native';
+import { ArrowUpDown, Search, X, FileText, User, Calendar, ChevronDown } from 'lucide-react-native';
+
+const CustomSelector = ({ label, value, options, onValueChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const selectedOption = options.find(opt => opt.value === value);
+  
+  return (
+    <View style={styles.customSelectorContainer}>
+      <Text style={styles.selectorLabel}>{label}</Text>
+      <TouchableOpacity
+        style={styles.selectorButton}
+        onPress={() => setIsOpen(!isOpen)}
+      >
+        <Text style={styles.selectorButtonText}>
+          {selectedOption?.label || 'Odaberite'}
+        </Text>
+        <ChevronDown 
+          size={16} 
+          color="#6B7280"
+          style={[styles.chevron, isOpen && styles.chevronUp]}
+        />
+      </TouchableOpacity>
+      
+      {isOpen && (
+        <View style={styles.selectorDropdown}>
+          {options.map((option) => (
+            <TouchableOpacity
+              key={option.value}
+              style={[
+                styles.selectorOption,
+                value === option.value && styles.selectorOptionSelected
+              ]}
+              onPress={() => {
+                onValueChange(option.value);
+                setIsOpen(false);
+              }}
+            >
+              <Text style={[
+                styles.selectorOptionText,
+                value === option.value && styles.selectorOptionTextSelected
+              ]}>
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
 
 const MedicalRecordModal = ({ isOpen, onClose, appointments }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -38,6 +87,11 @@ const MedicalRecordModal = ({ isOpen, onClose, appointments }) => {
 
     setFilteredAppointments(filtered);
   }, [appointments, searchTerm, sortBy]);
+
+  const sortOptions = [
+    { label: 'Najskoriji prvo', value: 'newest' },
+    { label: 'Najstariji prvo', value: 'oldest' }
+  ];
 
   const renderAppointmentItem = ({ item }) => {
     const date = new Date(item.appointmentDate);
@@ -113,20 +167,17 @@ const MedicalRecordModal = ({ isOpen, onClose, appointments }) => {
               />
             </View>
             
-            <View style={styles.sortContainer}>
-              <Text style={styles.sortLabel}>Sortiraj:</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={sortBy}
-                  onValueChange={(value) => setSortBy(value)}
-                  style={styles.picker}
-                >
-                  <Picker.Item label="Sortiraj po..." value="none" />
-                  <Picker.Item label="Najskoriji prvo" value="newest" />
-                  <Picker.Item label="Najstariji prvo" value="oldest" />
-                </Picker>
-              </View>
+            <View style={styles.filterHeader}>
+              <ArrowUpDown size={20} color="#374151" />
+              <Text style={styles.filterSectionTitle}>Sortiranje</Text>
             </View>
+            
+            <CustomSelector
+              label="Sortiraj po datumu"
+              value={sortBy}
+              options={sortOptions}
+              onValueChange={setSortBy}
+            />
           </View>
 
           {filteredAppointments.length > 0 ? (
@@ -168,7 +219,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     width: '100%',
     maxWidth: 500,
-    minHeight: '70%',
+    minHeight: '80%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
@@ -197,7 +248,7 @@ const styles = StyleSheet.create({
   filterSection: {
     backgroundColor: '#F8FAFC',
     paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
   },
@@ -207,7 +258,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     height: 50,
@@ -220,27 +271,82 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1E293B',
   },
-  sortContainer: {
+  filterHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    marginBottom: 16,
+    gap: 8,
   },
-  sortLabel: {
-    fontSize: 14,
+  filterSectionTitle: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#374151',
-    width: 60,
   },
-  pickerContainer: {
-    flex: 1,
+  customSelectorContainer: {
+    position: 'relative',
+  },
+  selectorLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 6,
+  },
+  selectorButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
-    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#D1D5DB',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 44,
   },
-  picker: {
-    height: 40,
-    color: '#1E293B',
+  selectorButtonText: {
+    fontSize: 15,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  chevron: {
+    transition: 'transform 0.2s',
+  },
+  chevronUp: {
+    transform: [{ rotate: '180deg' }],
+  },
+  selectorDropdown: {
+    position: 'absolute',
+    top: 44,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 10,
+    marginTop: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 10,
+    zIndex: 9999,
+  },
+  selectorOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  selectorOptionSelected: {
+    backgroundColor: '#EBF8FF',
+  },
+  selectorOptionText: {
+    fontSize: 15,
+    color: '#374151',
+  },
+  selectorOptionTextSelected: {
+    color: '#1D4ED8',
+    fontWeight: '500',
   },
   appointmentsList: {
     flex: 1,
