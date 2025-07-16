@@ -497,11 +497,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   startButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#003366',
     paddingHorizontal: 32,
     paddingVertical: 16,
     borderRadius: 25,
-    shadowColor: '#007AFF',
+    shadowColor: '#003366',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#007AFF',
+    backgroundColor: '#003366',
     borderRadius: 2,
   },
   testCounter: {
@@ -707,7 +707,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   retryButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#003366',
     paddingHorizontal: 32,
     paddingVertical: 16,
     borderRadius: 25,
@@ -715,7 +715,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    shadowColor: '#007AFF',
+    shadowColor: '#003366',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

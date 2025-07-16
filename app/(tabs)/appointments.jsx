@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#007AFF',
+    color: '#003366',
     marginBottom: 12,
   },
   cardText: {
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   assignButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#003366',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 12,
     marginTop: 12,
-    shadowColor: '#007AFF',
+    shadowColor: '#003366',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
@@ -596,7 +596,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#003366',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,

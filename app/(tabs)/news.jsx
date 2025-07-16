@@ -458,11 +458,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   addButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#003366',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,
-    shadowColor: '#007AFF',
+    shadowColor: '#003366',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   retryButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#003366',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,

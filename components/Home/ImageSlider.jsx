@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Image,
@@ -9,7 +9,7 @@ import {
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function ImageSlider({ slides }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -36,7 +36,7 @@ export default function ImageSlider({ slides }) {
     if (!isDragging) {
       const interval = setInterval(() => {
         goToNext();
-      }, 3000);
+      }, 4000);
 
       return () => clearInterval(interval);
     }
@@ -84,11 +84,15 @@ export default function ImageSlider({ slides }) {
 
       {/* Navigation Arrows */}
       <TouchableOpacity style={styles.arrowLeft} onPress={goToPrevious}>
-        <ChevronLeft size={24} color="#ffffff" />
+        <View style={styles.arrowBackground}>
+          <ChevronLeft size={24} color="#ffffff" />
+        </View>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.arrowRight} onPress={goToNext}>
-        <ChevronRight size={24} color="#ffffff" />
+        <View style={styles.arrowBackground}>
+          <ChevronRight size={24} color="#ffffff" />
+        </View>
       </TouchableOpacity>
 
       {/* Dots Indicator */}
@@ -101,11 +105,12 @@ export default function ImageSlider({ slides }) {
               {
                 backgroundColor:
                   currentIndex === slideIndex
-                    ? '#007AFF'
-                    : 'rgba(255, 255, 255, 0.5)',
+                    ? '#ffffff'
+                    : 'rgba(255, 255, 255, 0.4)',
                 transform: [
                   { scale: currentIndex === slideIndex ? 1.2 : 1 },
                 ],
+                width: currentIndex === slideIndex ? 28 : 10,
               },
             ]}
             onPress={() => goToSlide(slideIndex)}
@@ -118,8 +123,7 @@ export default function ImageSlider({ slides }) {
 
 const styles = StyleSheet.create({
   sliderContainer: {
-    height: 400,
-    width: screenWidth,
+    flex: 1,
     position: 'relative',
     backgroundColor: '#1a1a1a',
   },
@@ -140,43 +144,53 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     top: '50%',
-    transform: [{ translateY: -20 }],
-    backgroundColor: 'rgba(0, 122, 255, 0.3)',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+    transform: [{ translateY: -22 }],
     zIndex: 20,
   },
   arrowRight: {
     position: 'absolute',
     right: 16,
     top: '50%',
-    transform: [{ translateY: -20 }],
-    backgroundColor: 'rgba(0, 122, 255, 0.3)',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
+    transform: [{ translateY: -22 }],
+    zIndex: 20,
+  },
+  arrowBackground: {
+    backgroundColor: '#003366',
+    borderRadius: 22,
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 20,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   dotsContainer: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 30,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     zIndex: 20,
+    paddingHorizontal: 20,
   },
   dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
 });

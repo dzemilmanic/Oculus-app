@@ -192,6 +192,12 @@ export default function TabLayout() {
           href: null, // This hides the tab
         }}
       />
+      <Tabs.Screen
+        name="register"
+        options={{
+          href: null, // ima tab bar ali se ne prikazuje unutar njega
+        }}
+      />
     </Tabs>
   );
 }

@@ -9,10 +9,10 @@ import {
   Alert,
   ActivityIndicator,
   Linking,
-  SafeAreaView,
   Dimensions,
   Modal,
   TouchableWithoutFeedback,
+  Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,7 +22,9 @@ import ImageSlider from '@/components/Home/ImageSlider';
 import ReviewSection from '@/components/Home/ReviewSection';
 import { getUserRoleFromToken, isTokenValid } from '@/utils/tokenUtils';
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+const SLIDER_HEIGHT = screenHeight * 0.7; // 70% of screen height
 
 export default function Home() {
   const router = useRouter();
@@ -35,6 +37,7 @@ export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [selectedServiceInfo, setSelectedServiceInfo] = useState(null);
+  const scrollY = new Animated.Value(0);
 
   const slides = [
     {
@@ -87,7 +90,6 @@ export default function Home() {
     }
   }, []);
 
-  // Check auth status when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
       if (!showSplash) {
@@ -96,7 +98,6 @@ export default function Home() {
     }, [checkUserRole, showSplash])
   );
 
-  // Also check periodically for auth changes
   useEffect(() => {
     if (!showSplash) {
       const interval = setInterval(checkUserRole, 1000);
@@ -254,25 +255,58 @@ export default function Home() {
     );
   }
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Image Slider Section */}
-        <View style={styles.sliderContainer}>
-          <ImageSlider slides={slides} />
-          <View style={styles.welcomeOverlay}>
-            <Text style={styles.welcomeText}>Dobrodošli u Oculus</Text>
-            <TouchableOpacity
-              style={styles.reserveButton}
-              onPress={() => router.push('/services')}
-            >
-              <Text style={styles.reserveButtonText}>
-                Rezerviši svoj termin na vreme!
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+  // Animated values for slider
+  const sliderTranslateY = scrollY.interpolate({
+    inputRange: [0, SLIDER_HEIGHT * 0.8],
+    outputRange: [0, -SLIDER_HEIGHT],
+    extrapolate: 'clamp',
+  });
 
+  const sliderOpacity = scrollY.interpolate({
+    inputRange: [0, SLIDER_HEIGHT * 0.5, SLIDER_HEIGHT * 0.8],
+    outputRange: [1, 0.5, 0],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <View style={styles.container}>
+      {/* Image Slider Section - Fixed Position */}
+      <Animated.View 
+        style={[
+          styles.sliderContainer,
+          {
+            transform: [{ translateY: sliderTranslateY }],
+            opacity: sliderOpacity,
+          }
+        ]}
+      >
+        <ImageSlider slides={slides} />
+        <View style={styles.welcomeOverlay}>
+          <Text style={styles.welcomeText}>Dobrodošli u Oculus</Text>
+          <Text style={styles.welcomeSubtitle}>
+            Vaš vid je naša misija
+          </Text>
+          <TouchableOpacity
+            style={styles.reserveButton}
+            onPress={() => router.push('/services')}
+          >
+            <Text style={styles.reserveButtonText}>
+              Rezerviši svoj termin na vreme!
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+
+      <Animated.ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        style={[styles.scrollView, { paddingTop: SLIDER_HEIGHT }]}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
+      >
         {/* Mission Section */}
         <View style={[styles.section, styles.missionSection]}>
           <Text style={styles.sectionTitle}>Naša Misija</Text>
@@ -285,21 +319,21 @@ export default function Home() {
           </Text>
           <View style={styles.missionPoints}>
             <View style={styles.missionPoint}>
-              <Heart size={32} color="#007AFF" />
+              <Heart size={32} color="#667eea" />
               <Text style={styles.missionPointTitle}>Briga o pacijentima</Text>
               <Text style={styles.missionPointText}>
                 Individualni pristup svakom pacijentu
               </Text>
             </View>
             <View style={styles.missionPoint}>
-              <Users size={32} color="#007AFF" />
+              <Users size={32} color="#667eea" />
               <Text style={styles.missionPointTitle}>Stručni tim</Text>
               <Text style={styles.missionPointText}>
                 Iskusni oftalmolozi i medicinsko osoblje
               </Text>
             </View>
             <View style={styles.missionPoint}>
-              <CheckCircle2 size={32} color="#007AFF" />
+              <CheckCircle2 size={32} color="#667eea" />
               <Text style={styles.missionPointTitle}>Kvalitet</Text>
               <Text style={styles.missionPointText}>
                 Najviši standardi medicinske nege
@@ -312,7 +346,7 @@ export default function Home() {
         <View style={[styles.section, styles.servicesSection]}>
           <Text style={styles.sectionTitle}>Naše Usluge</Text>
           {loading ? (
-            <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
+            <ActivityIndicator size="large" color="#667eea" style={styles.loader} />
           ) : error ? (
             <Text style={styles.errorText}>{error}</Text>
           ) : (
@@ -329,7 +363,7 @@ export default function Home() {
                     }}
                     activeOpacity={0.7}
                   >
-                    <Info size={16} color="#007AFF" />
+                    <Info size={16} color="#667eea" />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -343,7 +377,7 @@ export default function Home() {
           <View style={styles.workingHoursContainer}>
             {workingHours.map((schedule, index) => (
               <View key={index} style={styles.hoursItem}>
-                <Clock size={24} color="#007AFF" />
+                <Clock size={24} color="#667eea" />
                 <View style={styles.hoursTextContainer}>
                   <Text style={styles.hoursDay}>{schedule.day}</Text>
                   <Text style={styles.hoursTime}>{schedule.hours}</Text>
@@ -358,7 +392,7 @@ export default function Home() {
           <Text style={styles.sectionTitle}>Kontakt Informacije</Text>
           <View style={styles.contactGrid}>
             <TouchableOpacity style={styles.contactItem} onPress={openMap}>
-              <MapPin size={32} color="#007AFF" />
+              <MapPin size={32} color="#667eea" />
               <View style={styles.contactTextContainer}>
                 <Text style={styles.contactTitle}>Adresa</Text>
                 <Text style={styles.contactText}>Pešterska 17, Tutin</Text>
@@ -367,7 +401,7 @@ export default function Home() {
             </TouchableOpacity>
             
             <View style={styles.contactItem}>
-              <Phone size={32} color="#007AFF" />
+              <Phone size={32} color="#667eea" />
               <View style={styles.contactTextContainer}>
                 <Text style={styles.contactTitle}>Telefon</Text>
                 <TouchableOpacity onPress={() => callPhone('020123456')}>
@@ -380,7 +414,7 @@ export default function Home() {
             </View>
             
             <View style={styles.contactItem}>
-              <Calendar size={32} color="#007AFF" />
+              <Calendar size={32} color="#667eea" />
               <View style={styles.contactTextContainer}>
                 <Text style={styles.contactTitle}>Zakazivanje</Text>
                 <TouchableOpacity
@@ -402,7 +436,7 @@ export default function Home() {
           role={userRole}
           isLoggedIn={isLoggedIn}
         />
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Service Info Modal */}
       <Modal
@@ -446,14 +480,20 @@ export default function Home() {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8f9fa',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   splashContainer: {
     flex: 1,
@@ -470,10 +510,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#ffffff',
     marginTop: 24,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   sliderContainer: {
-    height: 400,
-    position: 'relative',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: SLIDER_HEIGHT,
+    backgroundColor: '#1a1a1a',
+    zIndex: 10,
   },
   welcomeOverlay: {
     position: 'absolute',
@@ -483,45 +531,64 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     zIndex: 10,
     paddingHorizontal: 32,
   },
   welcomeText: {
-    fontSize: 28,
+    fontSize: 36,
     fontWeight: '800',
     color: '#ffffff',
     textAlign: 'center',
-    marginBottom: 24,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    marginBottom: 12,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    textShadowRadius: 6,
+    letterSpacing: 1,
+  },
+  welcomeSubtitle: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 32,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    opacity: 0.9,
   },
   reserveButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 25,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    backgroundColor: '#003366',
+    paddingHorizontal: 40,
+    paddingVertical: 18,
+    borderRadius: 30,
+    shadowColor: '#003366',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   reserveButtonText: {
     color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     textAlign: 'center',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   section: {
     paddingHorizontal: 24,
     paddingVertical: 48,
   },
   missionSection: {
-    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 48,
   },
   servicesSection: {
     backgroundColor: '#f8f9fa',
@@ -533,16 +600,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   sectionTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: '#1a202c',
     textAlign: 'center',
     marginBottom: 32,
+    letterSpacing: 0.5,
   },
   sectionText: {
     fontSize: 16,
-    lineHeight: 24,
-    color: '#666666',
+    lineHeight: 26,
+    color: '#64748b',
     textAlign: 'center',
     marginBottom: 32,
   },
@@ -551,36 +619,40 @@ const styles = StyleSheet.create({
   },
   missionPoint: {
     backgroundColor: '#ffffff',
-    padding: 24,
-    borderRadius: 16,
+    padding: 28,
+    borderRadius: 20,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 12,
+    elevation: 6,
+    borderTopWidth: 3,
+    borderTopColor: '#667eea',
   },
   missionPointTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: '#1a202c',
     marginTop: 16,
     marginBottom: 8,
     textAlign: 'center',
   },
   missionPointText: {
-    fontSize: 14,
-    color: '#666666',
+    fontSize: 15,
+    color: '#64748b',
     textAlign: 'center',
+    lineHeight: 22,
   },
   loader: {
     marginVertical: 32,
   },
   errorText: {
-    color: '#dc2626',
+    color: '#ef4444',
     textAlign: 'center',
     fontSize: 16,
     marginVertical: 32,
+    fontWeight: '500',
   },
   servicesGrid: {
     gap: 16,
@@ -589,106 +661,109 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
-    padding: 20,
+    padding: 24,
     borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 12,
+    elevation: 6,
     gap: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#667eea',
   },
   serviceText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#1a1a1a',
+    color: '#1a202c',
     flex: 1,
   },
   infoButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F0F9FF',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f0f9ff',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#007AFF',
+    borderWidth: 2,
+    borderColor: '#667eea',
   },
-  // Info Modal Styles
   infoModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
   },
   infoModalContent: {
     backgroundColor: 'white',
-    borderRadius: 16,
+    borderRadius: 24,
     width: '100%',
     maxWidth: 400,
     maxHeight: '70%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 10,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 15,
+    borderTopWidth: 4,
+    borderTopColor: '#667eea',
   },
   infoModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    backgroundColor: '#F8FAFC',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderBottomColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   infoModalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1a202c',
     flex: 1,
     marginRight: 12,
   },
   infoModalCloseButton: {
-    padding: 4,
-    borderRadius: 12,
-    backgroundColor: '#F3F4F6',
+    padding: 8,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
   },
   infoModalScrollView: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
     maxHeight: 300,
   },
   infoModalDescription: {
     fontSize: 16,
     color: '#374151',
-    lineHeight: 24,
-    marginBottom: 20,
+    lineHeight: 26,
+    marginBottom: 24,
   },
   infoModalPriceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F9FF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
+    backgroundColor: '#f0f9ff',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#bfdbfe',
   },
   infoModalPriceLabel: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#1E40AF',
+    fontWeight: '600',
+    color: '#1e40af',
     marginRight: 8,
   },
   infoModalPrice: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#1E40AF',
+    color: '#1e40af',
   },
   workingHoursContainer: {
     gap: 16,
@@ -696,10 +771,12 @@ const styles = StyleSheet.create({
   hoursItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    padding: 20,
-    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    padding: 24,
+    borderRadius: 16,
     gap: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#667eea',
   },
   hoursTextContainer: {
     flex: 1,
@@ -707,12 +784,12 @@ const styles = StyleSheet.create({
   hoursDay: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: '#1a202c',
     marginBottom: 4,
   },
   hoursTime: {
     fontSize: 14,
-    color: '#666666',
+    color: '#64748b',
   },
   contactGrid: {
     gap: 24,
@@ -721,51 +798,62 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     backgroundColor: '#ffffff',
-    padding: 24,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    padding: 28,
+    borderRadius: 20,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    gap: 16,
+    shadowRadius: 12,
+    elevation: 6,
+    gap: 20,
+    borderTopWidth: 3,
+    borderTopColor: '#667eea',
   },
   contactTextContainer: {
     flex: 1,
   },
   contactTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: '#1a202c',
     marginBottom: 8,
   },
   contactText: {
-    fontSize: 14,
-    color: '#666666',
+    fontSize: 15,
+    color: '#64748b',
     marginBottom: 4,
+    lineHeight: 22,
   },
   tapToOpenText: {
-    fontSize: 12,
-    color: '#007AFF',
+    fontSize: 13,
+    color: '#667eea',
     fontStyle: 'italic',
+    fontWeight: '500',
   },
   phoneNumber: {
     fontSize: 16,
-    color: '#007AFF',
+    color: '#667eea',
     marginBottom: 4,
     textDecorationLine: 'underline',
+    fontWeight: '500',
   },
   appointmentButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 20,
+    backgroundColor: '#667eea',
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 25,
     marginTop: 8,
     alignSelf: 'flex-start',
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   appointmentButtonText: {
     color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });

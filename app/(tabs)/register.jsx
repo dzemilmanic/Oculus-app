@@ -256,7 +256,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  },
+    marginTop: 28
+},
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
@@ -392,7 +393,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   registerButton: {
-    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    backgroundColor: '#003366',
     paddingVertical: 18,
     paddingHorizontal: 24,
     borderRadius: 16,

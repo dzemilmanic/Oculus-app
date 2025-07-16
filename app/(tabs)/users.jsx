@@ -615,7 +615,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   roleButtonActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#003366',
     borderColor: '#007AFF',
   },
   roleButtonText: {
@@ -627,12 +627,12 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   addButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#003366',
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 24,
     alignItems: 'center',
-    shadowColor: '#007AFF',
+    shadowColor: '#003366',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -797,7 +797,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#003366',
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 24,
@@ -897,7 +897,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   roleSelectionButtonActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#003366',
     borderColor: '#007AFF',
   },
   roleSelectionText: {
@@ -923,7 +923,7 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#003366',
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',

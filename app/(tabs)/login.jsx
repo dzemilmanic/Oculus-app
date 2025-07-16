@@ -337,13 +337,14 @@ const styles = StyleSheet.create({
     color: '#10b981',
   },
   loginButton: {
-    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    backgroundColor: '#003366',
+    paddingVertical: 18,
     paddingVertical: 18,
     paddingHorizontal: 24,
     borderRadius: 16,
     alignItems: 'center',
     marginTop: 16,
-    shadowColor: '#667eea',
+    shadowColor: '#003366',
     shadowOffset: {
       width: 0,
       height: 8,
