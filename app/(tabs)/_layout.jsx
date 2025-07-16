@@ -4,19 +4,31 @@ import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { isTokenValid } from '@/utils/tokenUtils';
+import { isTokenValid, getUserRoleFromToken } from '@/utils/tokenUtils';
 
 export default function TabLayout() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Check login status
+  // Check login status and admin role
   const checkAuthStatus = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
       const loggedIn = token && token.trim() !== '' && isTokenValid(token);
+      
       console.log('Auth check - Token exists:', loggedIn);
       setIsLoggedIn(loggedIn);
+      
+      // Check if user is admin
+      if (loggedIn && token) {
+        const userRole = getUserRoleFromToken(token);
+        const adminStatus = userRole === 'Admin';
+        console.log('User role:', userRole, 'Is admin:', adminStatus);
+        setIsAdmin(adminStatus);
+      } else {
+        setIsAdmin(false);
+      }
       
       // If token is invalid, remove it
       if (token && !loggedIn) {
@@ -26,6 +38,7 @@ export default function TabLayout() {
     } catch (error) {
       console.error('Error checking auth status:', error);
       setIsLoggedIn(false);
+      setIsAdmin(false);
     } finally {
       setLoading(false);
     }
@@ -111,6 +124,32 @@ export default function TabLayout() {
           tabBarIcon: ({ size, color }) => (
             <Ionicons name="newspaper" size={size} color={color} />
           ),
+        }}
+      />
+      
+      {/* Appointments tab - only show for admins */}
+      <Tabs.Screen
+        name="appointments"
+        options={{
+          title: 'Termini',
+          tabBarIcon: ({ size, color }) => (
+            <Ionicons name="calendar" size={size} color={color} />
+          ),
+          // Hide tab if user is not admin
+          href: isLoggedIn && isAdmin ? undefined : null,
+        }}
+      />
+
+      {/* Users tab - only show for admins */}
+      <Tabs.Screen
+        name="users"
+        options={{
+          title: 'Korisnici',
+          tabBarIcon: ({ size, color }) => (
+            <Ionicons name="people-outline" size={size} color={color} />
+          ),
+          // Hide tab if user is not admin
+          href: isLoggedIn && isAdmin ? undefined : null,
         }}
       />
 
