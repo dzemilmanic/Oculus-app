@@ -65,8 +65,8 @@ const Login = () => {
         {
           text: 'OK',
           onPress: () => {
-            // Tab layout will automatically detect the change
-            //console.log('Login successful, token saved');
+            // Redirect to index page after successful login
+            router.replace('/');
           }
         }
       ]);
@@ -338,7 +338,6 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     backgroundColor: '#003366',
-    paddingVertical: 18,
     paddingVertical: 18,
     paddingHorizontal: 24,
     borderRadius: 16,

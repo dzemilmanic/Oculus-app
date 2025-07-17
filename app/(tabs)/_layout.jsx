@@ -79,7 +79,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#007AFF',
+        tabBarActiveTintColor: '#003366',
         tabBarInactiveTintColor: '#8E8E93',
         tabBarStyle: {
           backgroundColor: '#ffffff',
@@ -195,6 +195,12 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="register"
+        options={{
+          href: null, // ima tab bar ali se ne prikazuje unutar njega
+        }}
+      />
+      <Tabs.Screen
+        name="password-reset"
         options={{
           href: null, // ima tab bar ali se ne prikazuje unutar njega
         }}
