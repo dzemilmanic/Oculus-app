@@ -319,21 +319,21 @@ export default function Home() {
           </Text>
           <View style={styles.missionPoints}>
             <View style={styles.missionPoint}>
-              <Heart size={32} color="#667eea" />
+              <Heart size={32} color="#3a6d9fff" />
               <Text style={styles.missionPointTitle}>Briga o pacijentima</Text>
               <Text style={styles.missionPointText}>
                 Individualni pristup svakom pacijentu
               </Text>
             </View>
             <View style={styles.missionPoint}>
-              <Users size={32} color="#667eea" />
+              <Users size={32} color="#3a6d9fff" />
               <Text style={styles.missionPointTitle}>Stručni tim</Text>
               <Text style={styles.missionPointText}>
                 Iskusni oftalmolozi i medicinsko osoblje
               </Text>
             </View>
             <View style={styles.missionPoint}>
-              <CheckCircle2 size={32} color="#667eea" />
+              <CheckCircle2 size={32} color="#3a6d9fff" />
               <Text style={styles.missionPointTitle}>Kvalitet</Text>
               <Text style={styles.missionPointText}>
                 Najviši standardi medicinske nege
@@ -346,7 +346,7 @@ export default function Home() {
         <View style={[styles.section, styles.servicesSection]}>
           <Text style={styles.sectionTitle}>Naše Usluge</Text>
           {loading ? (
-            <ActivityIndicator size="large" color="#667eea" style={styles.loader} />
+            <ActivityIndicator size="large" color="#003366" style={styles.loader} />
           ) : error ? (
             <Text style={styles.errorText}>{error}</Text>
           ) : (
@@ -363,7 +363,7 @@ export default function Home() {
                     }}
                     activeOpacity={0.7}
                   >
-                    <Info size={16} color="#667eea" />
+                    <Info size={16} color="#003366" />
                   </TouchableOpacity>
                 </View>
               ))}

@@ -27,26 +27,59 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userHasReview, setUserHasReview] = useState(false);
 
+  // Safely get reviews length
+  const reviewsLength = reviews && Array.isArray(reviews) ? reviews.length : 0;
+
+  // Ensure currentIndex is within bounds
+  useEffect(() => {
+    if (reviewsLength > 0 && currentIndex >= reviewsLength) {
+      setCurrentIndex(0);
+    }
+  }, [reviewsLength, currentIndex]);
+
   const goToPrevious = () => {
-    const isFirstSlide = currentIndex === 0;
-    const newIndex = isFirstSlide ? reviews.length - 1 : currentIndex - 1;
-    setCurrentIndex(newIndex);
+    if (reviewsLength <= 1) return;
+    
+    try {
+      const isFirstSlide = currentIndex === 0;
+      const newIndex = isFirstSlide ? reviewsLength - 1 : currentIndex - 1;
+      setCurrentIndex(Math.max(0, Math.min(newIndex, reviewsLength - 1)));
+    } catch (error) {
+      //console.error('Error in goToPrevious:', error);
+      setCurrentIndex(0);
+    }
   };
 
   const goToNext = () => {
-    const isLastSlide = currentIndex === reviews.length - 1;
-    const newIndex = isLastSlide ? 0 : currentIndex + 1;
-    setCurrentIndex(newIndex);
+    if (reviewsLength <= 1) return;
+    
+    try {
+      const isLastSlide = currentIndex === reviewsLength - 1;
+      const newIndex = isLastSlide ? 0 : currentIndex + 1;
+      setCurrentIndex(Math.max(0, Math.min(newIndex, reviewsLength - 1)));
+    } catch (error) {
+      //console.error('Error in goToNext:', error);
+      setCurrentIndex(0);
+    }
   };
 
   const panGesture = Gesture.Pan()
     .onEnd((event) => {
-      if (event.translationX > 50) {
+      if (!reviews || !Array.isArray(reviews) || reviews.length <= 1) {
+        return;
+      }
+      
+      const threshold = 50;
+      
+      if (event.translationX > threshold) {
+        // Swipe right - go to previous
         goToPrevious();
-      } else if (event.translationX < -50) {
+      } else if (event.translationX < -threshold) {
+        // Swipe left - go to next
         goToNext();
       }
-    });
+    })
+    .runOnJS(true);
 
   const handleStarPress = (rating) => {
     setNewReview({ ...newReview, rating });
@@ -243,7 +276,8 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
     </Modal>
   );
 
-  if (!reviews || reviews.length === 0) {
+  // Safe check for reviews
+  if (!reviews || !Array.isArray(reviews) || reviews.length === 0) {
     return (
       <View style={styles.container}>
         <Text style={styles.sectionTitle}>Recenzije pacijenata</Text>
@@ -265,6 +299,9 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
     );
   }
 
+  // Ensure currentIndex is within bounds
+  const safeCurrentIndex = Math.max(0, Math.min(currentIndex, reviewsLength - 1));
+
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Recenzije pacijenata</Text>
@@ -273,48 +310,55 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
         <GestureDetector gesture={panGesture}>
           <View style={styles.reviewsCarousel}>
             {reviews.map((review, index) => {
-              let translateX = (index - currentIndex) * (screenWidth - 48);
-              let scale = index === currentIndex ? 1 : 0.85;
-              let opacity = index === currentIndex ? 1 : 0.4;
+              if (!review || !review.id) return null;
               
-              return (
-                <View
-                  key={review.id}
-                  style={[
-                    styles.reviewCard,
-                    {
-                      transform: [{ translateX }, { scale }],
-                      opacity,
-                    },
-                  ]}
-                >
-                  <View style={styles.reviewHeader}>
-                    <View style={styles.reviewRatingContainer}>
-                      {renderStars(review.rating)}
-                      <Text style={styles.ratingText}>({review.rating}/5)</Text>
+              try {
+                let translateX = (index - safeCurrentIndex) * (screenWidth - 48);
+                let scale = index === safeCurrentIndex ? 1 : 0.85;
+                let opacity = index === safeCurrentIndex ? 1 : 0.4;
+                
+                return (
+                  <View
+                    key={review.id}
+                    style={[
+                      styles.reviewCard,
+                      {
+                        transform: [{ translateX }, { scale }],
+                        opacity,
+                      },
+                    ]}
+                  >
+                    <View style={styles.reviewHeader}>
+                      <View style={styles.reviewRatingContainer}>
+                        {renderStars(review.rating || 0)}
+                        <Text style={styles.ratingText}>({review.rating || 0}/5)</Text>
+                      </View>
+                      {role === 'Admin' && (
+                        <TouchableOpacity
+                          onPress={() => handleDeleteReview(review.id)}
+                          style={styles.deleteButton}
+                        >
+                          <Trash2 size={18} color="#dc2626" />
+                        </TouchableOpacity>
+                      )}
                     </View>
-                    {role === 'Admin' && (
-                      <TouchableOpacity
-                        onPress={() => handleDeleteReview(review.id)}
-                        style={styles.deleteButton}
-                      >
-                        <Trash2 size={18} color="#dc2626" />
-                      </TouchableOpacity>
-                    )}
+                    
+                    <Text style={styles.reviewContent}>"{review.content || ''}"</Text>
+                    
+                    <View style={styles.reviewFooter}>
+                      <Text style={styles.reviewAuthor}>
+                        {review.authorName || 'Anonimni korisnik'}
+                      </Text>
+                      <Text style={styles.reviewDate}>
+                        {review.createdOn ? new Date(review.createdOn).toLocaleDateString('sr-RS') : ''}
+                      </Text>
+                    </View>
                   </View>
-                  
-                  <Text style={styles.reviewContent}>"{review.content}"</Text>
-                  
-                  <View style={styles.reviewFooter}>
-                    <Text style={styles.reviewAuthor}>
-                      {review.authorName || 'Anonimni korisnik'}
-                    </Text>
-                    <Text style={styles.reviewDate}>
-                      {new Date(review.createdOn).toLocaleDateString('sr-RS')}
-                    </Text>
-                  </View>
-                </View>
-              );
+                );
+              } catch (error) {
+                //console.error('Error rendering review card:', error);
+                return null;
+              }
             })}
           </View>
         </GestureDetector>
@@ -327,11 +371,15 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
               style={[
                 styles.dot,
                 {
-                  backgroundColor: index === currentIndex ? '#007AFF' : '#E5E5E7',
-                  transform: [{ scale: index === currentIndex ? 1.2 : 1 }],
+                  backgroundColor: index === safeCurrentIndex ? '#007AFF' : '#E5E5E7',
+                  transform: [{ scale: index === safeCurrentIndex ? 1.2 : 1 }],
                 },
               ]}
-              onPress={() => setCurrentIndex(index)}
+              onPress={() => {
+                if (index >= 0 && index < reviewsLength) {
+                  setCurrentIndex(index);
+                }
+              }}
             />
           ))}
         </View>
@@ -458,7 +506,7 @@ const styles = StyleSheet.create({
   reviewAuthor: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#007AFF',
+    color: '#003366',
   },
   reviewDate: {
     fontSize: 12,
@@ -485,13 +533,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#007AFF',
+    backgroundColor: '#003366',
     paddingHorizontal: 32,
     paddingVertical: 16,
     borderRadius: 25,
     gap: 8,
     alignSelf: 'center',
-    shadowColor: '#007AFF',
+    shadowColor: '#003366',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -575,12 +623,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   submitButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#003366',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 8,
-    shadowColor: '#007AFF',
+    shadowColor: '#003366',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
