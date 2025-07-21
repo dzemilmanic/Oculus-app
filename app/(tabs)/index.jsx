@@ -12,7 +12,6 @@ import {
   Dimensions,
   Modal,
   TouchableWithoutFeedback,
-  Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -24,20 +23,18 @@ import { getUserRoleFromToken, isTokenValid } from '@/utils/tokenUtils';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-const SLIDER_HEIGHT = screenHeight * 0.7; // 70% of screen height
+const SLIDER_HEIGHT = screenHeight * 0.92; 
 
 export default function Home() {
   const router = useRouter();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [reviews, setReviews] = useState([]);
   const [userRole, setUserRole] = useState('');
   const [showSplash, setShowSplash] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [selectedServiceInfo, setSelectedServiceInfo] = useState(null);
-  const scrollY = new Animated.Value(0);
 
   const slides = [
     {
@@ -71,20 +68,16 @@ export default function Home() {
   const checkUserRole = React.useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
-      //console.log('Checking user role, token exists:', !!token);
       
       if (token && isTokenValid(token)) {
         const role = getUserRoleFromToken(token);
-        //console.log('User role from token:', role);
         setUserRole(role);
         setIsLoggedIn(true);
       } else {
-        //console.log('No token found or invalid, setting as User');
         setUserRole('');
         setIsLoggedIn(false);
       }
     } catch (error) {
-      //console.error('Error checking user role:', error);
       setUserRole('');
       setIsLoggedIn(false);
     }
@@ -129,92 +122,6 @@ export default function Home() {
     }
   };
 
-  const fetchReviews = async () => {
-    try {
-      const response = await fetch(
-        'https://klinikabackend-production.up.railway.app/api/Review'
-      );
-      if (!response.ok) {
-        throw new Error('Greška prilikom dohvatanja recenzija');
-      }
-      const data = await response.json();
-      setReviews(data);
-    } catch (error) {
-      //console.error(error.message);
-    }
-  };
-
-  const handleAddReview = async (newReview) => {
-    try {
-      const token = await AsyncStorage.getItem('jwtToken');
-      if (!token || !isTokenValid(token)) {
-        Alert.alert('Greška', 'Sesija je istekla. Molimo prijavite se ponovo.');
-        return;
-      }
-
-      const response = await fetch(
-        'https://klinikabackend-production.up.railway.app/api/Review',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(newReview),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        Alert.alert(
-          'Greška',
-          errorData?.message || 'Došlo je do greške prilikom dodavanja recenzije.'
-        );
-        return;
-      }
-
-      const addedReview = await response.json();
-      setReviews((prevReviews) => [...prevReviews, addedReview]);
-      Alert.alert('Uspeh', 'Recenzija je uspešno dodata!');
-    } catch (error) {
-      //console.error('Greška prilikom dodavanja recenzije:', error);
-      Alert.alert('Greška', 'Došlo je do greške prilikom povezivanja sa serverom.');
-    }
-  };
-
-  const handleDeleteReview = async (reviewId) => {
-    try {
-      const token = await AsyncStorage.getItem('jwtToken');
-      if (!token || !isTokenValid(token)) {
-        Alert.alert('Greška', 'Sesija je istekla. Molimo prijavite se ponovo.');
-        return;
-      }
-
-      const response = await fetch(
-        `https://klinikabackend-production.up.railway.app/api/Review/${reviewId}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        Alert.alert('Greška', 'Greška prilikom brisanja recenzije.');
-        return;
-      }
-
-      setReviews((prevReviews) =>
-        prevReviews.filter((review) => review.id !== reviewId)
-      );
-      Alert.alert('Uspeh', 'Recenzija je uspešno obrisana!');
-    } catch (error) {
-      //console.error('Greška prilikom brisanja recenzije:', error);
-      Alert.alert('Greška', 'Došlo je do greške prilikom brisanja recenzije.');
-    }
-  };
-
   const openMap = () => {
     const url = 'https://maps.google.com/?q=Pešterska+17,+Tutin';
     Linking.openURL(url);
@@ -236,7 +143,6 @@ export default function Home() {
     if (!showSplash) {
       checkUserRole();
       fetchServices();
-      fetchReviews();
     }
   }, [showSplash]);
 
@@ -255,58 +161,32 @@ export default function Home() {
     );
   }
 
-  // Animated values for slider
-  const sliderTranslateY = scrollY.interpolate({
-    inputRange: [0, SLIDER_HEIGHT * 0.8],
-    outputRange: [0, -SLIDER_HEIGHT],
-    extrapolate: 'clamp',
-  });
-
-  const sliderOpacity = scrollY.interpolate({
-    inputRange: [0, SLIDER_HEIGHT * 0.5, SLIDER_HEIGHT * 0.8],
-    outputRange: [1, 0.5, 0],
-    extrapolate: 'clamp',
-  });
-
   return (
     <View style={styles.container}>
-      {/* Image Slider Section - Fixed Position */}
-      <Animated.View 
-        style={[
-          styles.sliderContainer,
-          {
-            transform: [{ translateY: sliderTranslateY }],
-            opacity: sliderOpacity,
-          }
-        ]}
-      >
-        <ImageSlider slides={slides} />
-        <View style={styles.welcomeOverlay}>
-          <Text style={styles.welcomeText}>Dobrodošli u Oculus</Text>
-          <Text style={styles.welcomeSubtitle}>
-            Vaš vid je naša misija
-          </Text>
-          <TouchableOpacity
-            style={styles.reserveButton}
-            onPress={() => router.push('/services')}
-          >
-            <Text style={styles.reserveButtonText}>
-              Rezerviši svoj termin na vreme!
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </Animated.View>
-
-      <Animated.ScrollView
+      <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        style={[styles.scrollView, { paddingTop: SLIDER_HEIGHT }]}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
-        scrollEventThrottle={16}
+        style={styles.scrollView}
       >
+        {/* Image Slider Section - Sada je deo scroll view-a */}
+        <View style={styles.sliderContainer}>
+          <ImageSlider slides={slides} />
+          <View style={styles.welcomeOverlay}>
+            <Text style={styles.welcomeText}>Dobrodošli u Oculus</Text>
+            <Text style={styles.welcomeSubtitle}>
+              Vaš vid je naša misija
+            </Text>
+            <TouchableOpacity
+              style={styles.reserveButton}
+              onPress={() => router.push('/services')}
+            >
+              <Text style={styles.reserveButtonText}>
+                Rezerviši svoj termin na vreme!
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Mission Section */}
         <View style={[styles.section, styles.missionSection]}>
           <Text style={styles.sectionTitle}>Naša Misija</Text>
@@ -430,13 +310,10 @@ export default function Home() {
 
         {/* Reviews Section */}
         <ReviewSection
-          reviews={reviews}
-          onAddReview={handleAddReview}
-          onDeleteReview={handleDeleteReview}
           role={userRole}
           isLoggedIn={isLoggedIn}
         />
-      </Animated.ScrollView>
+      </ScrollView>
 
       {/* Service Info Modal */}
       <Modal
@@ -515,13 +392,9 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   sliderContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
     height: SLIDER_HEIGHT,
     backgroundColor: '#1a1a1a',
-    zIndex: 10,
+    position: 'relative', // Umesto 'absolute'
   },
   welcomeOverlay: {
     position: 'absolute',
@@ -586,8 +459,9 @@ const styles = StyleSheet.create({
     paddingVertical: 48,
   },
   missionSection: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: '#ffffff', // Dodao belu pozadinu
+    borderTopLeftRadius: 0, // Uklonio zaokružene uglove
+    borderTopRightRadius: 0,
     paddingTop: 48,
   },
   servicesSection: {

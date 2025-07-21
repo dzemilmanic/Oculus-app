@@ -21,14 +21,18 @@ import { isTokenValid, decodeJWTToken } from '@/utils/tokenUtils';
 
 const { width: screenWidth } = Dimensions.get('window');
 
+const GRAPHQL_ENDPOINT = 'https://oculus-app-backend-production.up.railway.app/graphql';
+
 export default function ReviewSection({ reviews, onAddReview, onDeleteReview, role, isLoggedIn }) {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newReview, setNewReview] = useState({ rating: 0, content: '' });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userHasReview, setUserHasReview] = useState(false);
+  const [localReviews, setLocalReviews] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Safely get reviews length
-  const reviewsLength = reviews && Array.isArray(reviews) ? reviews.length : 0;
+  const reviewsLength = localReviews && Array.isArray(localReviews) ? localReviews.length : 0;
 
   // Ensure currentIndex is within bounds
   useEffect(() => {
@@ -36,6 +40,258 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
       setCurrentIndex(0);
     }
   }, [reviewsLength, currentIndex]);
+
+  // GraphQL queries and mutations
+  const REVIEWS_QUERY = `
+    query GetReviews {
+      reviews {
+        Id
+        Rating
+        Content
+        CreatedOn
+        UpdatedOn
+        AuthorName
+      }
+    }
+  `;
+
+  const USER_REVIEW_CHECK_QUERY = `
+    query UserReviewCheck {
+      userReviewCheck {
+        hasReview
+      }
+    }
+  `;
+
+  const CREATE_REVIEW_MUTATION = `
+    mutation CreateReview($input: ReviewInput!) {
+      createReview(input: $input) {
+        Id
+        Rating
+        Content
+        CreatedOn
+        UpdatedOn
+        AuthorName
+      }
+    }
+  `;
+
+  const DELETE_REVIEW_MUTATION = `
+    mutation DeleteReview($id: ID!) {
+      deleteReview(id: $id) {
+        Success
+        Message
+      }
+    }
+  `;
+
+  // GraphQL request helper
+  const makeGraphQLRequest = async (query, variables = {}, requireAuth = false) => {
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+
+      if (requireAuth) {
+        const token = await AsyncStorage.getItem('jwtToken');
+        if (!token || !isTokenValid(token)) {
+          throw new Error('Token nije valjan ili je istekao');
+        }
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(GRAPHQL_ENDPOINT, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          query,
+          variables,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.errors) {
+        throw new Error(result.errors[0]?.message || 'GraphQL greška');
+      }
+
+      return result.data;
+    } catch (error) {
+      //console.error('GraphQL request error:', error);
+      throw error;
+    }
+  };
+
+  // Fetch reviews from GraphQL
+  const fetchReviews = async () => {
+    try {
+      setLoading(true);
+      const data = await makeGraphQLRequest(REVIEWS_QUERY);
+      
+      // Transform data to match expected format
+      const transformedReviews = data.reviews.map(review => ({
+        id: review.Id,
+        rating: review.Rating,
+        content: review.Content,
+        createdOn: review.CreatedOn,
+        updatedOn: review.UpdatedOn,
+        authorName: review.AuthorName,
+      }));
+      
+      setLocalReviews(transformedReviews);
+    } catch (error) {
+      //console.error('Greška pri dohvatanju recenzija:', error);
+      Alert.alert('Greška', 'Nije moguće učitati recenzije.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Check if user has review
+  const checkUserReviewStatus = async () => {
+    if (!isLoggedIn) {
+      setUserHasReview(false);
+      return;
+    }
+
+    try {
+      const data = await makeGraphQLRequest(USER_REVIEW_CHECK_QUERY, {}, true);
+      setUserHasReview(data.userReviewCheck.hasReview);
+    } catch (error) {
+      //console.error('Greška pri proveri statusa recenzije:', error);
+      setUserHasReview(false);
+    }
+  };
+
+  // Add review via GraphQL
+  const handleAddReviewGraphQL = async () => {
+    if (newReview.rating === 0) {
+      Alert.alert('Greška', 'Molimo odaberite ocenu.');
+      return;
+    }
+    if (newReview.content.trim() === '') {
+      Alert.alert('Greška', 'Molimo unesite komentar.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      const variables = {
+        input: {
+          Rating: newReview.rating,
+          Content: newReview.content.trim(),
+        },
+      };
+
+      const data = await makeGraphQLRequest(CREATE_REVIEW_MUTATION, variables, true);
+      
+      // Transform and add to local state
+      const newReviewData = {
+        id: data.createReview.Id,
+        rating: data.createReview.Rating,
+        content: data.createReview.Content,
+        createdOn: data.createReview.CreatedOn,
+        updatedOn: data.createReview.UpdatedOn,
+        authorName: data.createReview.AuthorName,
+      };
+
+      setLocalReviews(prev => [newReviewData, ...prev]);
+      setNewReview({ rating: 0, content: '' });
+      setIsModalVisible(false);
+      setUserHasReview(true);
+      
+      Alert.alert('Uspeh', 'Recenzija je uspešno dodana!');
+    } catch (error) {
+      //console.error('Greška pri dodavanju recenzije:', error);
+      Alert.alert('Greška', error.message || 'Došlo je do greške prilikom dodavanja recenzije.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete review via GraphQL
+  const handleDeleteReviewGraphQL = async (reviewId) => {
+    try {
+      setLoading(true);
+      
+      const variables = { id: reviewId };
+      const data = await makeGraphQLRequest(DELETE_REVIEW_MUTATION, variables, true);
+      
+      if (data.deleteReview.Success) {
+        setLocalReviews(prev => prev.filter(review => review.id !== reviewId));
+        Alert.alert('Uspeh', 'Recenzija je uspešno obrisana!');
+      } else {
+        Alert.alert('Greška', data.deleteReview.Message || 'Greška pri brisanju recenzije.');
+      }
+    } catch (error) {
+      //console.error('Greška pri brisanju recenzije:', error);
+      Alert.alert('Greška', error.message || 'Došlo je do greške prilikom brisanja recenzije.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Format date function (improved)
+  const formatDate = (dateString) => {
+    try {
+      if (!dateString) return 'Datum nije dostupan';
+      
+      //console.log('Raw date from GraphQL:', dateString, typeof dateString);
+      
+      let date;
+      
+      if (typeof dateString === 'string') {
+        // Try direct parsing as ISO string
+        date = new Date(dateString);
+        
+        // If direct parsing fails, try cleaning the string
+        if (isNaN(date.getTime())) {
+          const cleanedDate = dateString
+            .replace(/[^\d\-T:\.Z\+]/g, '')
+            .replace(/(\d{4}-\d{2}-\d{2})$/, '$1T00:00:00.000Z');
+          
+          //console.log('Cleaned date:', cleanedDate);
+          date = new Date(cleanedDate);
+        }
+        
+        // Try .NET JSON format (/Date(timestamp)/)
+        if (isNaN(date.getTime()) && dateString.includes('/Date(')) {
+          const timestamp = dateString.match(/\/Date\((\d+)\)\//);
+          if (timestamp) {
+            date = new Date(parseInt(timestamp[1], 10));
+          }
+        }
+        
+        // Try timestamp as string
+        if (isNaN(date.getTime()) && /^\d+$/.test(dateString)) {
+          const timestamp = parseInt(dateString, 10);
+          date = new Date(timestamp < 10000000000 ? timestamp * 1000 : timestamp);
+        }
+        
+      } else if (typeof dateString === 'number') {
+        date = new Date(dateString < 10000000000 ? dateString * 1000 : dateString);
+      }
+      
+      if (!date || isNaN(date.getTime())) {
+        //console.error('Failed to parse date:', dateString);
+        return 'Nepravilan datum';
+      }
+      
+      //console.log('Parsed date:', date);
+      
+      return date.toLocaleDateString('sr-RS', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      //console.error('Error formatting date:', error, 'Input:', dateString);
+      return 'Greška u formatiranju datuma';
+    }
+  };
 
   const goToPrevious = () => {
     if (reviewsLength <= 1) return;
@@ -45,7 +301,6 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
       const newIndex = isFirstSlide ? reviewsLength - 1 : currentIndex - 1;
       setCurrentIndex(Math.max(0, Math.min(newIndex, reviewsLength - 1)));
     } catch (error) {
-      //console.error('Error in goToPrevious:', error);
       setCurrentIndex(0);
     }
   };
@@ -58,24 +313,21 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
       const newIndex = isLastSlide ? 0 : currentIndex + 1;
       setCurrentIndex(Math.max(0, Math.min(newIndex, reviewsLength - 1)));
     } catch (error) {
-      //console.error('Error in goToNext:', error);
       setCurrentIndex(0);
     }
   };
 
   const panGesture = Gesture.Pan()
     .onEnd((event) => {
-      if (!reviews || !Array.isArray(reviews) || reviews.length <= 1) {
+      if (!localReviews || !Array.isArray(localReviews) || localReviews.length <= 1) {
         return;
       }
       
       const threshold = 50;
       
       if (event.translationX > threshold) {
-        // Swipe right - go to previous
         goToPrevious();
       } else if (event.translationX < -threshold) {
-        // Swipe left - go to next
         goToNext();
       }
     })
@@ -83,35 +335,6 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
 
   const handleStarPress = (rating) => {
     setNewReview({ ...newReview, rating });
-  };
-
-  const handleSubmitReview = async () => {
-    if (newReview.rating === 0) {
-      Alert.alert('Greška', 'Molimo odaberite ocenu.');
-      return;
-    }
-    if (newReview.content.trim() === '') {
-      Alert.alert('Greška', 'Molimo unesite komentar.');
-      return;
-    }
-
-    try {
-      const token = await AsyncStorage.getItem('jwtToken');
-      if (token && isTokenValid(token)) {
-        const payload = decodeJWTToken(token);
-        const authorName = `${payload.FirstName || 'Nepoznato'} ${
-          payload.LastName || 'Nepoznato'
-        }`;
-        
-        const reviewWithAuthor = { ...newReview, authorName };
-        await onAddReview(reviewWithAuthor);
-        setNewReview({ rating: 0, content: '' });
-        setIsModalVisible(false);
-        setUserHasReview(true);
-      }
-    } catch (error) {
-      Alert.alert('Greška', 'Došlo je do greške prilikom dodavanja recenzije.');
-    }
   };
 
   const handleDeleteReview = (reviewId) => {
@@ -123,38 +346,10 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
         {
           text: 'Obriši',
           style: 'destructive',
-          onPress: () => onDeleteReview(reviewId),
+          onPress: () => handleDeleteReviewGraphQL(reviewId),
         },
       ]
     );
-  };
-
-  const checkUserStatus = async () => {
-    try {
-      const token = await AsyncStorage.getItem('jwtToken');
-      if (token && isTokenValid(token)) {
-        // Proveri da li korisnik već ima recenziju
-        const response = await fetch(
-          'https://klinikabackend-production.up.railway.app/api/Review/user-review',
-          {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          setUserHasReview(data.hasReview);
-        }
-      } else {
-        setUserHasReview(false);
-      }
-    } catch (error) {
-      //console.error('Greška pri proveri statusa korisnika:', error);
-      setUserHasReview(false);
-    }
   };
 
   const handleAddReviewPress = () => {
@@ -179,13 +374,18 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
     setIsModalVisible(true);
   };
 
+  // Load data on component mount and when login status changes
+  useEffect(() => {
+    fetchReviews();
+  }, []);
+
   useEffect(() => {
     if (isLoggedIn) {
-      checkUserStatus();
+      checkUserReviewStatus();
     } else {
       setUserHasReview(false);
     }
-  }, [role, isLoggedIn]);
+  }, [isLoggedIn]);
 
   const renderStars = (rating, interactive = false) => {
     return (
@@ -261,12 +461,14 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
                 <TouchableOpacity
                   style={[
                     styles.submitButton,
-                    (newReview.rating === 0 || newReview.content.trim() === '') && styles.submitButtonDisabled,
+                    (newReview.rating === 0 || newReview.content.trim() === '' || loading) && styles.submitButtonDisabled,
                   ]}
-                  onPress={handleSubmitReview}
-                  disabled={newReview.rating === 0 || newReview.content.trim() === ''}
+                  onPress={handleAddReviewGraphQL}
+                  disabled={newReview.rating === 0 || newReview.content.trim() === '' || loading}
                 >
-                  <Text style={styles.submitButtonText}>Pošalji recenziju</Text>
+                  <Text style={styles.submitButtonText}>
+                    {loading ? 'Šalje se...' : 'Pošalji recenziju'}
+                  </Text>
                 </TouchableOpacity>
               </ScrollView>
             </View>
@@ -277,7 +479,7 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
   );
 
   // Safe check for reviews
-  if (!reviews || !Array.isArray(reviews) || reviews.length === 0) {
+  if (!localReviews || !Array.isArray(localReviews) || localReviews.length === 0) {
     return (
       <View style={styles.container}>
         <Text style={styles.sectionTitle}>Recenzije pacijenata</Text>
@@ -287,11 +489,14 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
             Budite prvi koji će podeliti svoje iskustvo!
           </Text>
           <TouchableOpacity
-            style={styles.addReviewButton}
+            style={[styles.addReviewButton, loading && styles.addReviewButtonDisabled]}
             onPress={handleAddReviewPress}
+            disabled={loading}
           >
             <Plus size={20} color="#ffffff" />
-            <Text style={styles.addReviewButtonText}>Napiši prvu recenziju</Text>
+            <Text style={styles.addReviewButtonText}>
+              {loading ? 'Učitava...' : 'Napiši prvu recenziju'}
+            </Text>
           </TouchableOpacity>
         </View>
         {renderModal()}
@@ -309,7 +514,7 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
       <View style={styles.carouselContainer}>
         <GestureDetector gesture={panGesture}>
           <View style={styles.reviewsCarousel}>
-            {reviews.map((review, index) => {
+            {localReviews.map((review, index) => {
               if (!review || !review.id) return null;
               
               try {
@@ -337,6 +542,7 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
                         <TouchableOpacity
                           onPress={() => handleDeleteReview(review.id)}
                           style={styles.deleteButton}
+                          disabled={loading}
                         >
                           <Trash2 size={18} color="#dc2626" />
                         </TouchableOpacity>
@@ -350,7 +556,7 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
                         {review.authorName || 'Anonimni korisnik'}
                       </Text>
                       <Text style={styles.reviewDate}>
-                        {review.createdOn ? new Date(review.createdOn).toLocaleDateString('sr-RS') : ''}
+                        {formatDate(review.createdOn)}
                       </Text>
                     </View>
                   </View>
@@ -365,7 +571,7 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
         
         {/* Dots indicator */}
         <View style={styles.dotsContainer}>
-          {reviews.map((_, index) => (
+          {localReviews.map((_, index) => (
             <TouchableOpacity
               key={index}
               style={[
@@ -388,11 +594,14 @@ export default function ReviewSection({ reviews, onAddReview, onDeleteReview, ro
       {/* Add Review Button - samo za prijavljene korisnike koji nemaju recenziju */}
       {isLoggedIn && !userHasReview && role !== 'Admin' && (
         <TouchableOpacity
-          style={styles.addReviewButton}
+          style={[styles.addReviewButton, loading && styles.addReviewButtonDisabled]}
           onPress={handleAddReviewPress}
+          disabled={loading}
         >
           <Plus size={20} color="#ffffff" />
-          <Text style={styles.addReviewButtonText}>Napiši recenziju</Text>
+          <Text style={styles.addReviewButtonText}>
+            {loading ? 'Učitava...' : 'Napiši recenziju'}
+          </Text>
         </TouchableOpacity>
       )}
 
@@ -544,6 +753,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  addReviewButtonDisabled: {
+    backgroundColor: '#cccccc',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   addReviewButtonText: {
     color: '#ffffff',
