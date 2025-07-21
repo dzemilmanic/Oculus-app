@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Modal,
   StyleSheet,
-  Alert,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -27,22 +26,44 @@ const AddNewsModal = ({
 
   useEffect(() => {
     if (editNews) {
-      setTitle(editNews.title);
-      setContent(editNews.content);
+      setTitle(editNews.title || '');
+      setContent(editNews.content || '');
     } else {
       setTitle('');
       setContent('');
     }
-  }, [editNews]);
+  }, [editNews, isOpen]);
 
   const handleSubmit = () => {
-    if (editNews) {
-      onEdit(title, content);
-      Alert.alert('Uspeh', 'Vest uspešno ažurirana!');
-    } else {
-      onAdd(title, content);
-      Alert.alert('Uspeh', 'Vest uspešno dodata!');
+    if (!title.trim()) {
+      return;
     }
+    
+    if (!content.trim()) {
+      return;
+    }
+
+    if (title.length < 2) {
+      return;
+    }
+
+    if (content.length < 10) {
+      return;
+    }
+
+    // KRITIČNA ISPRAVKA: NE pozivaj Alert ovdje!
+    // Alert će biti pozvan u parent komponenti NAKON uspješne operacije
+    if (editNews) {
+      onEdit(title.trim(), content.trim());
+    } else {
+      onAdd(title.trim(), content.trim());
+    }
+  };
+
+  const handleClose = () => {
+    setTitle('');
+    setContent('');
+    onClose();
   };
 
   return (
@@ -50,7 +71,7 @@ const AddNewsModal = ({
       visible={isOpen}
       animationType="slide"
       transparent={true}
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -80,9 +101,9 @@ const AddNewsModal = ({
                       multiline={false}
                       returnKeyType="next"
                     />
-                    {errorMessage && title.length < 2 && (
+                    {title.length > 0 && title.length < 2 && (
                       <Text style={styles.errorText}>
-                        Naslov mora imati najmanje 2 slova.
+                        Naslov mora imati najmanje 2 karaktera.
                       </Text>
                     )}
                   </View>
@@ -100,25 +121,37 @@ const AddNewsModal = ({
                       textAlignVertical="top"
                       returnKeyType="done"
                     />
-                    {errorMessage && content.length < 10 && (
+                    {content.length > 0 && content.length < 10 && (
                       <Text style={styles.errorText}>
-                        Sadržaj mora imati najmanje 10 slova.
+                        Sadržaj mora imati najmanje 10 karaktera.
                       </Text>
                     )}
                   </View>
 
+                  {errorMessage ? (
+                    <View style={styles.generalErrorContainer}>
+                      <Text style={styles.generalErrorText}>
+                        {errorMessage}
+                      </Text>
+                    </View>
+                  ) : null}
+
                   <View style={styles.modalActions}>
                     <TouchableOpacity
-                      style={styles.submitButton}
+                      style={[
+                        styles.submitButton,
+                        (title.length < 2 || content.length < 10) && styles.submitButtonDisabled
+                      ]}
                       onPress={handleSubmit}
+                      disabled={title.length < 2 || content.length < 10}
                     >
                       <Text style={styles.submitButtonText}>
-                        {editNews ? 'Spremi' : 'Dodaj'}
+                        {editNews ? 'Ažuriraj' : 'Dodaj'}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.cancelButton}
-                      onPress={onClose}
+                      onPress={handleClose}
                     >
                       <Text style={styles.cancelButtonText}>Zatvori</Text>
                     </TouchableOpacity>
@@ -136,7 +169,7 @@ const AddNewsModal = ({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -146,7 +179,7 @@ const styles = StyleSheet.create({
     maxWidth: 800,
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    maxHeight: '50%',
+    maxHeight: '80%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
@@ -190,13 +223,26 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#DC2626',
-    fontSize: 15,
+    fontSize: 14,
     marginTop: 8,
     padding: 12,
     backgroundColor: '#FEF2F2',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#FECACA',
+  },
+  generalErrorContainer: {
+    marginBottom: 24,
+  },
+  generalErrorText: {
+    color: '#DC2626',
+    fontSize: 16,
+    padding: 16,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    textAlign: 'center',
   },
   modalActions: {
     flexDirection: 'row',
@@ -217,6 +263,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#CCCCCC',
+    shadowOpacity: 0.1,
   },
   submitButtonText: {
     color: '#FFFFFF',

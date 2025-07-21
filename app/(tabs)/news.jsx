@@ -18,6 +18,8 @@ import NewsCard from '../../components/News/NewsCard';
 import AddNewsModal from '../../components/News/AddNewsModal';
 import { getUserRoleFromToken } from '../../utils/tokenUtils';
 
+const GRAPHQL_ENDPOINT = 'https://oculus-app-backend-production.up.railway.app/graphql';
+
 const News = () => {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,19 +51,82 @@ const News = () => {
     return () => clearInterval(interval);
   }, []);
 
+  const makeGraphQLRequest = async (query, variables = {}, requiresAuth = false) => {
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+
+      if (requiresAuth) {
+        const token = await AsyncStorage.getItem('jwtToken');
+        if (!token) {
+          throw new Error('Niste prijavljeni. Molimo prijavite se ponovo.');
+        }
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const response = await fetch(GRAPHQL_ENDPOINT, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          query,
+          variables,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.errors) {
+        //console.error('GraphQL errors:', result.errors);
+        throw new Error(result.errors[0].message);
+      }
+
+      return result.data;
+    } catch (error) {
+      //console.error('GraphQL request error:', error);
+      throw error;
+    }
+  };
+
   const fetchNews = async () => {
     try {
-      const response = await fetch(
-        'https://klinikabackend-production.up.railway.app/api/News'
-      );
-      if (!response.ok) {
-        throw new Error('Error loading news.');
-      }
-      const data = await response.json();
-      setNews(data);
+      const query = `
+        query {
+          allNews {
+            Id
+            Title
+            Content
+            PublishedDate
+          }
+        }
+      `;
+
+      const data = await makeGraphQLRequest(query);
+      
+      // Transform data to match existing component structure
+      const transformedNews = data.allNews.map(item => ({
+        id: item.Id,
+        title: item.Title,
+        content: item.Content,
+        publishedDate: item.PublishedDate,
+      }));
+
+      // Sort by date
+      const sortedNews = transformedNews.sort((a, b) => {
+        const dateA = new Date(a.publishedDate).getTime();
+        const dateB = new Date(b.publishedDate).getTime();
+        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+      });
+
+      setNews(sortedNews);
       setLoading(false);
       setRefreshing(false);
     } catch (error) {
+      //console.error('Fetch news error:', error);
       setError(error.message);
       setLoading(false);
       setRefreshing(false);
@@ -88,7 +153,6 @@ const News = () => {
   const checkUserRole = React.useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('jwtToken');
-      //console.log('Checking user role, token exists:', !!token);
       
       if (token && token.trim() !== '') {
         const role = getUserRoleFromToken(token);
@@ -96,7 +160,6 @@ const News = () => {
         setUserRole(role || 'User');
         setIsLoggedIn(true);
       } else {
-        //console.log('No token found, setting as User');
         setUserRole('User');
         setIsLoggedIn(false);
       }
@@ -110,50 +173,61 @@ const News = () => {
   const handleAddNews = async (title, content) => {
     if (title.length < 2 || content.length < 10) {
       setErrorMessage(
-        'Title must have at least 2 characters and content at least 10 characters.'
+        'Naslov mora imati najmanje 2 karaktera a sadržaj najmanje 10 karaktera.'
       );
       return;
     }
 
     try {
-      const token = await AsyncStorage.getItem('jwtToken');
-      if (!token) {
-        Alert.alert('Greška', 'Niste prijavljeni. Molimo prijavite se ponovo.');
-        return;
-      }
+      setErrorMessage(''); // Clear previous errors
       
-      const response = await fetch(
-        'https://klinikabackend-production.up.railway.app/api/News',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            title,
-            content,
-            publishedDate: new Date().toISOString(),
-          }),
+      const mutation = `
+        mutation CreateNews($input: NewsInput!) {
+          createNews(input: $input) {
+            Id
+            Title
+            Content
+            PublishedDate
+          }
         }
-      );
+      `;
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          Alert.alert('Greška', 'Nemate dozvolu. Molimo prijavite se ponovo.');
-          await AsyncStorage.removeItem('jwtToken');
-          checkUserRole();
-          return;
-        }
-        throw new Error('Error adding news.');
-      }
+      const variables = {
+        input: {
+          Title: title,
+          Content: content,
+          PublishedDate: new Date().toISOString(),
+        },
+      };
 
-      const addedNews = await response.json();
-      setNews([addedNews, ...news]);
+      //console.log('Creating news with variables:', variables);
+
+      const data = await makeGraphQLRequest(mutation, variables, true);
+      
+      // Transform data to match existing component structure
+      const newNewsItem = {
+        id: data.createNews.Id,
+        title: data.createNews.Title,
+        content: data.createNews.Content,
+        publishedDate: data.createNews.PublishedDate,
+      };
+
+      setNews([newNewsItem, ...news]);
       setIsModalOpen(false);
       setErrorMessage('');
+      
+      // OVDJE pozovi success alert tek nakon uspješne operacije
+      Alert.alert('Uspjeh', 'Vest je uspješno dodana!');
+      
     } catch (error) {
-      setErrorMessage(error.message);
+      //console.error('Add news error:', error);
+      if (error.message.includes('dozvolu') || error.message.includes('authorization')) {
+        Alert.alert('Greška', 'Nemate dozvolu. Molimo prijavite se ponovo.');
+        await AsyncStorage.removeItem('jwtToken');
+        checkUserRole();
+      } else {
+        setErrorMessage(error.message);
+      }
     }
   };
 
@@ -171,56 +245,67 @@ const News = () => {
   const handleEditNewsSubmit = async (title, content) => {
     if (title.length < 2 || content.length < 10) {
       setErrorMessage(
-        'Title must have at least 2 characters and content at least 10 characters.'
+        'Naslov mora imati najmanje 2 karaktera a sadržaj najmanje 10 karaktera.'
       );
       return;
     }
 
     try {
-      const token = await AsyncStorage.getItem('jwtToken');
-      if (!token) {
-        Alert.alert('Greška', 'Niste prijavljeni. Molimo prijavite se ponovo.');
-        return;
-      }
+      setErrorMessage(''); // Clear previous errors
       
-      const response = await fetch(
-        `https://klinikabackend-production.up.railway.app/api/News/${editNews.id}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            id: editNews.id,
-            title,
-            content,
-            publishedDate: new Date().toISOString(),
-          }),
+      const mutation = `
+        mutation UpdateNews($id: Int!, $input: NewsUpdateInput!) {
+          updateNews(id: $id, input: $input) {
+            Id
+            Title
+            Content
+            PublishedDate
+          }
         }
-      );
+      `;
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          Alert.alert('Greška', 'Nemate dozvolu. Molimo prijavite se ponovo.');
-          await AsyncStorage.removeItem('jwtToken');
-          checkUserRole();
-          return;
-        }
-        throw new Error('Error updating news.');
-      }
+      const variables = {
+        id: parseInt(editNews.id),
+        input: {
+          Title: title,
+          Content: content,
+          PublishedDate: new Date().toISOString(),
+        },
+      };
 
-      const updatedNewsData = await response.json();
+      //console.log('Updating news with variables:', variables);
+
+      const data = await makeGraphQLRequest(mutation, variables, true);
+      
+      // Transform data to match existing component structure
+      const updatedNewsItem = {
+        id: data.updateNews.Id,
+        title: data.updateNews.Title,
+        content: data.updateNews.Content,
+        publishedDate: data.updateNews.PublishedDate,
+      };
+
       setNews(
         news.map((item) =>
-          item.id === updatedNewsData.id ? updatedNewsData : item
+          item.id === updatedNewsItem.id ? updatedNewsItem : item
         )
       );
       setEditNews(null);
       setIsModalOpen(false);
       setErrorMessage('');
+      
+      // OVDJE pozovi success alert tek nakon uspješne operacije
+      Alert.alert('Uspjeh', 'Vest je uspješno ažurirana!');
+      
     } catch (error) {
-      setErrorMessage(error.message);
+      //console.error('Edit news error:', error);
+      if (error.message.includes('dozvolu') || error.message.includes('authorization')) {
+        Alert.alert('Greška', 'Nemate dozvolu. Molimo prijavite se ponovo.');
+        await AsyncStorage.removeItem('jwtToken');
+        checkUserRole();
+      } else {
+        setErrorMessage(error.message);
+      }
     }
   };
 
@@ -236,40 +321,41 @@ const News = () => {
 
   const confirmDelete = async () => {
     try {
-      const token = await AsyncStorage.getItem('jwtToken');
-      if (!token) {
-        Alert.alert('Greška', 'Niste prijavljeni. Molimo prijavite se ponovo.');
-        setShowDeleteModal(false);
-        return;
-      }
-      
-      const response = await fetch(
-        `https://klinikabackend-production.up.railway.app/api/News/${newsToDeleteId}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      const mutation = `
+        mutation DeleteNews($id: Int!) {
+          deleteNews(id: $id) {
+            Success
+            Message
+          }
         }
-      );
+      `;
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          Alert.alert('Greška', 'Nemate dozvolu. Molimo prijavite se ponovo.');
-          await AsyncStorage.removeItem('jwtToken');
-          checkUserRole();
-          setShowDeleteModal(false);
-          return;
-        }
-        throw new Error('Error deleting news.');
+      const variables = {
+        id: parseInt(newsToDeleteId),
+      };
+
+      //console.log('Deleting news with variables:', variables);
+
+      const data = await makeGraphQLRequest(mutation, variables, true);
+
+      if (data.deleteNews.Success) {
+        setNews(news.filter((item) => item.id !== newsToDeleteId));
+        Alert.alert('Uspjeh', 'Vest je uspješno izbrisana!');
+      } else {
+        throw new Error(data.deleteNews.Message);
       }
 
-      setNews(news.filter((item) => item.id !== newsToDeleteId));
-      Alert.alert('Uspeh', 'Vest uspešno izbrisana!');
       setShowDeleteModal(false);
       setNewsToDeleteId(null);
     } catch (error) {
-      setError(error.message);
+      //console.error('Delete news error:', error);
+      if (error.message.includes('dozvolu') || error.message.includes('authorization')) {
+        Alert.alert('Greška', 'Nemate dozvolu. Molimo prijavite se ponovo.');
+        await AsyncStorage.removeItem('jwtToken');
+        checkUserRole();
+      } else {
+        Alert.alert('Greška', error.message);
+      }
       setShowDeleteModal(false);
       setNewsToDeleteId(null);
     }
@@ -518,7 +604,7 @@ const styles = StyleSheet.create({
   },
   deleteModalOverlay: {
     flex: 1,
-    
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -38,7 +38,7 @@ const base64Decode = (str) => {
     
     return result;
   } catch (error) {
-    //console.error('Base64 decode error:', error);
+    console.error('Base64 decode error:', error);
     return null;
   }
 };
@@ -46,13 +46,13 @@ const base64Decode = (str) => {
 export const decodeJWTToken = (token) => {
   try {
     if (!token || typeof token !== 'string') {
-      //console.log('Invalid token provided');
+      console.log('Invalid token provided');
       return null;
     }
 
     const parts = token.split('.');
     if (parts.length !== 3) {
-      //console.log('Invalid JWT token format');
+      console.log('Invalid JWT token format');
       return null;
     }
 
@@ -60,16 +60,16 @@ export const decodeJWTToken = (token) => {
     const decodedPayload = base64Decode(payload);
     
     if (!decodedPayload) {
-      //console.log('Failed to decode payload');
+      console.log('Failed to decode payload');
       return null;
     }
     
     const parsedPayload = JSON.parse(decodedPayload);
     
-    //console.log('Successfully decoded JWT token');
+    console.log('Successfully decoded JWT token:', parsedPayload);
     return parsedPayload;
   } catch (error) {
-    //console.error('Error decoding JWT token:', error);
+    console.error('Error decoding JWT token:', error);
     return null;
   }
 };
@@ -78,14 +78,18 @@ export const getUserRoleFromToken = (token) => {
   const payload = decodeJWTToken(token);
   if (!payload) return '';
   
-  return payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || '';
+  const role = payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || '';
+  console.log('Extracted role from token:', role);
+  return role;
 };
 
 export const getUserIdFromToken = (token) => {
   const payload = decodeJWTToken(token);
   if (!payload) return '';
   
-  return payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] || '';
+  const userId = payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] || '';
+  console.log('Extracted user ID from token:', userId);
+  return userId;
 };
 
 export const getUserFromToken = async () => {
@@ -97,9 +101,11 @@ export const getUserFromToken = async () => {
     if (!payload) return null;
     
     const role = payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || 'User';
-    return { role };
+    const userId = payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] || '';
+    
+    return { role, userId };
   } catch (error) {
-    //console.error('Greška prilikom dekodiranja tokena:', error);
+    console.error('Greška prilikom dekodiranja tokena:', error);
     return null;
   }
 };
@@ -111,7 +117,7 @@ export const isTokenValid = (token) => {
   // Check if token is expired
   const currentTime = Math.floor(Date.now() / 1000);
   if (payload.exp && payload.exp < currentTime) {
-    //console.log('Token is expired');
+    console.log('Token is expired');
     return false;
   }
   

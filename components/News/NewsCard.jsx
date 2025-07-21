@@ -3,10 +3,41 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Pencil, Trash2 } from 'lucide-react-native';
 
 const NewsCard = ({ id, title, content, publishedDate, isAdmin, onEdit, onDelete }) => {
+  
+  const formatDate = (dateString) => {
+    try {
+      if (!dateString) return 'Datum nije dostupan';
+      
+      const date = new Date(dateString);
+      
+      // Provjeri da li je datum valjan
+      if (isNaN(date.getTime())) {
+        return 'Nepravilan datum';
+      }
+      
+      return date.toLocaleDateString('sr-RS', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      //console.error('Error formatting date:', error);
+      return 'Greška u formatiranju datuma';
+    }
+  };
+
+  const truncateContent = (text, maxLength = 120) => {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength).trim() + '...';
+  };
+
   return (
     <View style={styles.newsCard}>
       <View style={styles.newsCardHeader}>
-        <Text style={styles.newsTitle}>{title}</Text>
+        <Text style={styles.newsTitle}>{title || 'Bez naslova'}</Text>
         {isAdmin && (
           <View style={styles.newsCardActions}>
             <TouchableOpacity
@@ -24,9 +55,11 @@ const NewsCard = ({ id, title, content, publishedDate, isAdmin, onEdit, onDelete
           </View>
         )}
       </View>
-      <Text style={styles.newsContent}>{content}</Text>
+      <Text style={styles.newsContent}>
+        {truncateContent(content)}
+      </Text>
       <Text style={styles.newsDate}>
-        {new Date(publishedDate).toLocaleDateString()}
+        {formatDate(publishedDate)}
       </Text>
     </View>
   );
