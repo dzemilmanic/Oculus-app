@@ -8,12 +8,54 @@ const NewsCard = ({ id, title, content, publishedDate, isAdmin, onEdit, onDelete
     try {
       if (!dateString) return 'Datum nije dostupan';
       
-      const date = new Date(dateString);
+      // Debug log da vidimo šta tačno stiže iz backend-a
+      //console.log('Raw date from backend:', dateString, typeof dateString);
       
-      // Provjeri da li je datum valjan
-      if (isNaN(date.getTime())) {
+      let date;
+      
+      // Različiti načini parsiranja datuma ovisno o formatu
+      if (typeof dateString === 'string') {
+        // Pokušaj 1: Direktno parsiranje kao ISO string
+        date = new Date(dateString);
+        
+        // Pokušaj 2: Ako direktno parsiranje ne radi, pokušaj sa čišćenjem
+        if (isNaN(date.getTime())) {
+          // Ukloni sve što nije dio validnog datuma
+          const cleanedDate = dateString
+            .replace(/[^\d\-T:\.Z\+]/g, '') // Ukloni sve osim brojeva, crtice, T, dvotačke, tačke, Z, +
+            .replace(/(\d{4}-\d{2}-\d{2})$/, '$1T00:00:00.000Z'); // Dodaj vrijeme ako ga nema
+          
+          //console.log('Cleaned date:', cleanedDate);
+          date = new Date(cleanedDate);
+        }
+        
+        // Pokušaj 3: Ako je .NET JSON format (/Date(timestamp)/)
+        if (isNaN(date.getTime()) && dateString.includes('/Date(')) {
+          const timestamp = dateString.match(/\/Date\((\d+)\)\//);
+          if (timestamp) {
+            date = new Date(parseInt(timestamp[1], 10));
+          }
+        }
+        
+        // Pokušaj 4: Ako je timestamp kao string
+        if (isNaN(date.getTime()) && /^\d+$/.test(dateString)) {
+          const timestamp = parseInt(dateString, 10);
+          // Ako je broj manji od 10^10, vjerovatno je u sekundama, inače milisekundama
+          date = new Date(timestamp < 10000000000 ? timestamp * 1000 : timestamp);
+        }
+        
+      } else if (typeof dateString === 'number') {
+        // Ako je već broj, provjeri da li je u sekundama ili milisekundama
+        date = new Date(dateString < 10000000000 ? dateString * 1000 : dateString);
+      }
+      
+      // Provjeri da li je datum valjan nakon svih pokušaja
+      if (!date || isNaN(date.getTime())) {
+        //console.error('Failed to parse date:', dateString);
         return 'Nepravilan datum';
       }
+      
+      //console.log('Parsed date:', date);
       
       return date.toLocaleDateString('sr-RS', {
         year: 'numeric',
@@ -23,7 +65,7 @@ const NewsCard = ({ id, title, content, publishedDate, isAdmin, onEdit, onDelete
         minute: '2-digit'
       });
     } catch (error) {
-      //console.error('Error formatting date:', error);
+      //console.error('Error formatting date:', error, 'Input:', dateString);
       return 'Greška u formatiranju datuma';
     }
   };

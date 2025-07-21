@@ -169,7 +169,6 @@ const AddNewsModal = ({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -179,7 +178,7 @@ const styles = StyleSheet.create({
     maxWidth: 800,
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    maxHeight: '80%',
+    maxHeight: '60%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
