@@ -255,37 +255,85 @@ const Profile = () => {
         return;
       }
 
+      // Pripremi GraphQL mutation
+      const mutation = `
+        mutation UpdateUserData($input: ChangeUserDataInput!) {
+          updateUserData(input: $input) {
+            Success
+            Message
+            User {
+              Id
+              FirstName
+              LastName
+              Biography
+              FullName
+            }
+          }
+        }
+      `;
+
+      // Pripremi varijable - samo pošalji polja koja se menjaju
+      const variables = {
+        input: {}
+      };
+
+      if (modalField === 'ime') {
+        variables.input.FirstName = newIme;
+      }
+      if (modalField === 'prezime') {
+        variables.input.LastName = newPrezime;
+      }
+      if (modalField === 'biography') {
+        variables.input.Biography = newBiography;
+      }
+
       const response = await fetch(
-        'https://klinikabackend-production.up.railway.app/api/ChangeUserData/update',
+        'https://oculus-app-backend-production.up.railway.app/graphql',
         {
-          method: 'PUT',
+          method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            FirstName: updatedUser.ime,
-            LastName: updatedUser.prezime,
-            Biography: updatedUser.biography,
-            OldPassword: newOldPassword || '',
-            NewPassword: newNewPassword || '',
+            query: mutation,
+            variables: variables,
           }),
         }
       );
 
-      if (response.ok) {
-        setUser(updatedUser);
-        setIsModalOpen(false);
-        if (modalField === 'password') {
-          Alert.alert('Uspeh', 'Lozinka je uspešno promenjena!');
+      const result = await response.json();
+
+      if (response.ok && result.data && result.data.updateUserData) {
+        const updateResult = result.data.updateUserData;
+        
+        if (updateResult.Success) {
+          // Ažuriraj lokalni state sa novim podacima
+          if (updateResult.User) {
+            setUser({
+              ...user,
+              ime: updateResult.User.FirstName,
+              prezime: updateResult.User.LastName,
+              biography: updateResult.User.Biography || '',
+            });
+          } else {
+            setUser(updatedUser);
+          }
+          
+          setIsModalOpen(false);
+          if (modalField === 'password') {
+            Alert.alert('Uspeh', 'Lozinka je uspešno promenjena!');
+          } else {
+            Alert.alert('Uspeh', updateResult.Message || 'Podaci su uspešno ažurirani!');
+          }
+          setNewOldPassword('');
+          setNewNewPassword('');
+          setShowOldPassword(false);
+          setShowNewPassword(false);
+          setErrorMessage('');
         } else {
-          Alert.alert('Uspeh', 'Podaci su uspešno ažurirani!');
+          setErrorMessage(updateResult.Message || 'Greška prilikom ažuriranja podataka.');
         }
-        setNewOldPassword('');
-        setNewNewPassword('');
-        setShowOldPassword(false);
-        setShowNewPassword(false);
-        setErrorMessage('');
       } else {
         if (response.status === 401) {
           Alert.alert('Greška', 'Sesija je istekla. Molimo prijavite se ponovo.');
@@ -293,12 +341,12 @@ const Profile = () => {
           setIsLoggedIn(false);
           return;
         }
-        const textResponse = await response.text();
-        try {
-          const errorData = JSON.parse(textResponse);
-          setErrorMessage(errorData.message || 'Greška prilikom ažuriranja podataka.');
-        } catch (error) {
-          setErrorMessage(textResponse || 'Greška prilikom ažuriranja podataka.');
+        
+        // Proveri da li ima GraphQL greške
+        if (result.errors && result.errors.length > 0) {
+          setErrorMessage(result.errors[0].message || 'Greška prilikom ažuriranja podataka.');
+        } else {
+          setErrorMessage('Greška prilikom ažuriranja podataka.');
         }
       }
     } catch (error) {
@@ -834,7 +882,7 @@ const styles = StyleSheet.create({
     padding: 0,
     minWidth: '98%',
     maxWidth: 800,
-    maxHeight: '40%',
+    maxHeight: '47%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
